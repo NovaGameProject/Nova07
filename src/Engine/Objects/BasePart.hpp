@@ -27,9 +27,12 @@ namespace Nova {
 
     class BasePart : public Instance {
     public:
-        Props::BasePartProps props;
         BasePart(std::string name) : Instance(name) {}
 
-        NOVA_OBJECT(BasePart, props)
+        virtual glm::mat4 GetLocalTransform() = 0;
+        virtual glm::vec3 GetSize() = 0;
+
+        // BasePart no longer holds its own 'props' or 'raw' pointers.
+        // It's up to Part, Seat, etc. to implement these.
     };
 }

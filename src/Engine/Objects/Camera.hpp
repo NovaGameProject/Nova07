@@ -6,6 +6,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+#pragma once
 #include <rfl/Flatten.hpp>
 #include <rfl/Rename.hpp>
 #include "Engine/Enums/Enums.hpp"
@@ -27,10 +28,11 @@ namespace Nova {
     class Camera : public Instance {
     public:
         Props::CameraProps props;
+
         Camera() : Instance("Camera") {}
 
         glm::mat4 GetViewMatrix() {
-            // The View Matrix is the inverse of the Camera's CFrame
+            // The View matrix is the inverse of the Camera's World CFrame
             return glm::inverse(props.CFrame.get().to_nova().to_mat4());
         }
 

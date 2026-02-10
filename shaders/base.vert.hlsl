@@ -6,8 +6,9 @@ struct VSOutput {
     float4 pos : SV_Position;
 };
 
+// Add the column_major modifier
 cbuffer SceneData : register(b0, space1) {
-    float4x4 mvp;
+    column_major float4x4 mvp;
 };
 
 VSOutput main(VSInput input) {

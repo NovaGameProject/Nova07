@@ -5,6 +5,7 @@
       "command": "cmake --build .",
       "cwd": "$ZED_WORKTREE_ROOT/build",
     },
+    "cwd": "$ZED_WORKTREE_ROOT/",
     "program": "$ZED_WORKTREE_ROOT/build/Nova07",
     "request": "launch",
     "adapter": "CodeLLDB",

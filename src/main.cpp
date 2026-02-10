@@ -1,6 +1,9 @@
-#include "Engine/Renderer.hpp"
+#include "Engine/Objects/Instance.hpp"
+#include "Engine/Rendering/Renderer.hpp"
 #include "Engine/Window.hpp"
 #include "Engine/TaskScheduler.hpp"
+#include "Engine/Nova.hpp"
+#include "Engine/Reflection/LevelLoader.hpp"
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -9,15 +12,92 @@ int main(int argc, char* argv[]) {
     Nova::TaskScheduler scheduler;
     bool running = true;
 
+
+    auto game = std::make_shared<Nova::DataModel>();
+    auto workspace = game->GetService<Nova::Workspace>();
+
+    // Load the world from a file
+    Nova::LevelLoader::Load("./resources/Places/HappyHomeInRobloxia.rbxl", game);
+
+    // MOVE CAMERA OUT OF THE FLOOR (Baseplate is at 0, size 512,8,512 -> y range -4 to 4)
+    {
+        auto workspace = game->GetService<Nova::Workspace>();
+        auto findCamera = [](auto& self, std::shared_ptr<Nova::Instance> inst) -> std::shared_ptr<Nova::Camera> {
+            if (auto c = std::dynamic_pointer_cast<Nova::Camera>(inst)) return c;
+            for (auto& child : inst->GetChildren()) {
+                if (auto found = self(self, child)) return found;
+            }
+            return nullptr;
+        };
+        if (auto camera = findCamera(findCamera, workspace)) {
+            auto cf = camera->props.CFrame.get().to_nova();
+            cf.position = glm::vec3(0, 20, 50); // Start back and up
+            camera->props.CFrame = Nova::CFrameReflect::from_nova(cf);
+            SDL_Log("Camera reset to starting position. PRESS ESC TO LOCK MOUSE AND MOVE.");
+        }
+    }
+
+    Nova::LevelLoader::PrintInstanceTree(game);
+
     // Use a unique_ptr so we can explicitly kill the renderer
     // before the window goes out of scope.
     auto renderer = std::make_unique<Nova::Renderer>(window.GetWindow());
 
+    // Outside the scheduler, define some camera state
+    float camSpeed = 50.0f;
+
     scheduler.AddJob({
         .name = "Input",
         .callback = [&](double dt) {
-            (void)dt;
             if (!window.PollEvents()) running = false;
+
+            // Helper: Find first camera (Recursive)
+            auto findCamera = [](auto& self, std::shared_ptr<Nova::Instance> inst) -> std::shared_ptr<Nova::Camera> {
+                if (auto c = std::dynamic_pointer_cast<Nova::Camera>(inst)) return c;
+                for (auto& child : inst->GetChildren()) {
+                    if (auto found = self(self, child)) return found;
+                }
+                return nullptr;
+            };
+            std::shared_ptr<Nova::Camera> camera = findCamera(findCamera, workspace);
+
+            // Inside the Input Job callback
+            if (camera) {
+                const bool* keys = SDL_GetKeyboardState(NULL);
+                float speed = 100.0f * (float)dt; // Increased speed for visibility
+                float sensitivity = 0.002f;
+
+                // 1. Convert the current reflected data to our math-friendly CFrame
+                auto novaCF = camera->props.CFrame.get().to_nova();
+
+                float dx = window.mouseDeltaX;
+                float dy = window.mouseDeltaY;
+
+                // 2. YAW: Rotate around World Up (Global Y-axis)
+                // Applying this on the LEFT side rotates around the global axis.
+                glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), -dx * sensitivity, glm::vec3(0, 1, 0));
+
+                // 3. PITCH: Rotate around Local Right (Local X-axis)
+                // Applying this on the RIGHT side rotates around the object's own axis.
+                glm::mat4 pitch = glm::rotate(glm::mat4(1.0f), -dy * sensitivity, glm::vec3(1, 0, 0));
+
+                // 4. COMBINE: New Rotation = Yaw * CurrentRotation * Pitch
+                novaCF.rotation = glm::mat3(yaw * glm::mat4(novaCF.rotation) * pitch);
+
+                // 5. TRANSLATION (WASD + EQ)
+                glm::vec3 forward = -novaCF.rotation[2]; // Forward is -Z in Roblox/GLM
+                glm::vec3 right   = novaCF.rotation[0]; // Right is +X
+
+                if (keys[SDL_SCANCODE_W]) novaCF.position += forward * speed;
+                if (keys[SDL_SCANCODE_S]) novaCF.position -= forward * speed;
+                if (keys[SDL_SCANCODE_A]) novaCF.position -= right * speed;
+                if (keys[SDL_SCANCODE_D]) novaCF.position += right * speed;
+                if (keys[SDL_SCANCODE_E]) novaCF.position.y += speed; // Fly UP
+                if (keys[SDL_SCANCODE_Q]) novaCF.position.y -= speed; // Fly DOWN
+
+                // 6. Push the modified data back into the reflected property
+                camera->props.CFrame = Nova::CFrameReflect::from_nova(novaCF);
+            }
             scheduler.ProcessMainThreadTasks();
         },
         .priority = 0,
@@ -28,7 +108,9 @@ int main(int argc, char* argv[]) {
         .name = "Render",
         .callback = [&](double dt) {
             (void)dt;
-            if (renderer) renderer->RenderFrame();
+            // Get the Workspace from your DataModel
+            auto workspace = game->GetService<Nova::Workspace>();
+            renderer->RenderFrame(workspace);
         },
         .priority = 100,
         .frequency = 0

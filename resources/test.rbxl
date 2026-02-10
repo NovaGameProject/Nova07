@@ -1,4 +1,9 @@
-<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<roblox
+    xmlns:xmime="http://www.w3.org/2005/05/xmlmime"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd"
+    version="4"
+>
 	<External>null</External>
 	<External>nil</External>
 	<Item class="Workspace" referent="RBX0">
@@ -74,7 +79,7 @@
 				<int name="BrickColor">28</int>
 				<CoordinateFrame name="CFrame">
 					<X>0</X>
-					<Y>0.200000048</Y>
+					<Y>0</Y>
 					<Z>0</Z>
 					<R00>1</R00>
 					<R01>0</R01>
@@ -127,47 +132,12 @@
 				<token name="shape">1</token>
 				<Vector3 name="size">
 					<X>512</X>
-					<Y>0.400000006</Y>
+					<Y>8</Y>
 					<Z>512</Z>
 				</Vector3>
 			</Properties>
 		</Item>
-		<Item class="Camera" referent="RBX1">
-			<Properties>
-				<Ref name="CameraSubject">null</Ref>
-				<token name="CameraType">5</token>
-				<CoordinateFrame name="CoordinateFrame">
-					<X>7.98879433</X>
-					<Y>12.0199585</Y>
-					<Z>37.7285576</Z>
-					<R00>0.83718276</R00>
-					<R01>-0.239663273</R01>
-					<R02>0.491616219</R02>
-					<R10>-4.47034836e-008</R10>
-					<R11>0.898876131</R11>
-					<R12>0.438202888</R12>
-					<R20>-0.54692322</R20>
-					<R21>-0.366855949</R21>
-					<R22>0.752523601</R22>
-				</CoordinateFrame>
-				<CoordinateFrame name="Focus">
-					<X>3.96234248e-019</X>
-					<Y>4.89913368</Y>
-					<Z>25.5</Z>
-					<R00>-1</R00>
-					<R01>-3.35683605e-021</R01>
-					<R02>-5.56001808e-021</R02>
-					<R10>-3.35683605e-021</R10>
-					<R11>1</R11>
-					<R12>4.53737404e-021</R12>
-					<R20>5.56001808e-021</R20>
-					<R21>4.53737404e-021</R21>
-					<R22>-1</R22>
-				</CoordinateFrame>
-				<string name="Name">Instance</string>
-				<bool name="archivable">true</bool>
-			</Properties>
-		</Item>
+
 	</Item>
 	<Item class="RunService" referent="RBX4">
 		<Properties>

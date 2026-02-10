@@ -19,9 +19,13 @@ struct CFrame {
     glm::mat3 rotation = glm::mat3(1.0f);
 
     // This converts your CFrame into the 4x4 matrix used for Rendering/Physics
+    // Explicit version for MathTypes.hpp
     glm::mat4 to_mat4() const {
-        glm::mat4 m = glm::mat4(rotation); // Fill the top-left 3x3
-        m[3] = glm::vec4(position, 1.0f);   // Set the translation column
+        glm::mat4 m(1.0f);
+        m[0] = glm::vec4(rotation[0], 0.0f); // Basis X
+        m[1] = glm::vec4(rotation[1], 0.0f); // Basis Y
+        m[2] = glm::vec4(rotation[2], 0.0f); // Basis Z
+        m[3] = glm::vec4(position, 1.0f);    // Translation
         return m;
     }
 

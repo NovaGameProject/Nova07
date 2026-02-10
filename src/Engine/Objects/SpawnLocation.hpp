@@ -24,6 +24,14 @@ namespace Nova {
         Props::SpawnLocationProps props;
         SpawnLocation() : Part("SpawnLocation") {}
 
+        glm::mat4 GetLocalTransform() override {
+            return props.base.get().base.get().CFrame.get().to_nova().to_mat4();
+        }
+
+        glm::vec3 GetSize() override {
+            return props.base.get().base.get().size.to_glm();
+        }
+
         NOVA_OBJECT(SpawnLocation, props)
     };
 

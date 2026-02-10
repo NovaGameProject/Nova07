@@ -96,20 +96,21 @@ namespace Nova {
 
     void LevelLoader::ProcessItemPass1(pugi::xml_node node, std::shared_ptr<Instance> parent) {
         const char* className = node.attribute("class").value();
+        std::string refId = node.attribute("referent").value();
 
-        // Use the className you already extracted at the top of the function
-        std::cout << "[DEBUG] Creating: " << className
-                  << " | Parent: " << (parent ? "Has Parent" : "Root/Null") << std::endl;
-        std::string refId = std::string(node.attribute("referent").value());
+        std::shared_ptr<Instance> inst = nullptr;
 
+        // List of classes that should be treated as singletons/services
+        static const std::set<std::string> serviceClasses = {
+            "Workspace", "Lighting", "RunService", "Selection", "Debris"
+        };
 
-        // 1. Check if this is a Service that already exists in the parent
-        // (e.g., Workspace, Lighting inside the DataModel)
-        std::shared_ptr<Instance> inst = FindService(parent, className);
-
+        if (serviceClasses.contains(className)) {
+            inst = FindService(parent, className);
+        }
 
         if (!inst) {
-            // Only create it if it doesn't already exist
+            // Now "Part" will always result in a new creation
             inst = InstanceFactory::Get().Create(className);
             if (!inst) return;
             inst->SetParent(parent);
