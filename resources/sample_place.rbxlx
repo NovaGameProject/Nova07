@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<roblox version="4">
+	<Item class="Workspace" referent="1">
+		<Properties>
+			<string name="Name">Workspace</string>
+		</Properties>
+		
+		<Item class="Part" referent="2">
+			<Properties>
+				<string name="Name">Baseplate</string>
+				<Vector3 name="Position">0, -0.5, 0</Vector3>
+				<Vector3 name="Size">50, 1, 50</Vector3>
+				<Color3 name="Color">0.1, 0.7, 0.1</Color3>
+			</Properties>
+		</Item>
+		
+		<Item class="Part" referent="3">
+			<Properties>
+				<string name="Name">RedBlock</string>
+				<Vector3 name="Position">5, 2, 5</Vector3>
+				<Vector3 name="Size">4, 4, 4</Vector3>
+				<Color3 name="Color">0.8, 0.1, 0.1</Color3>
+			</Properties>
+		</Item>
+		
+		<Item class="Part" referent="4">
+			<Properties>
+				<string name="Name">GrayPillar</string>
+				<Vector3 name="Position">-5, 5, -5</Vector3>
+				<Vector3 name="Size">2, 10, 2</Vector3>
+				<Color3 name="Color">0.8, 0.8, 0.8</Color3>
+			</Properties>
+		</Item>
+		
+		<Item class="Camera" referent="5">
+			<Properties>
+				<string name="Name">MainCamera</string>
+				<Vector3 name="Position">15, 15, 15</Vector3>
+				<float name="FieldOfView">70</float>
+			</Properties>
+		</Item>
+	</Item>
+</roblox>

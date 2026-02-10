@@ -1,0 +1,16 @@
+{
+  "name": "nova-engine",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "name": "sdl3",
+      "features": ["vulkan"]
+    },
+    "reflectcpp",
+    "luau",
+    "luabridge3",
+    "glm",
+    "joltphysics",
+    "pugixml"
+  ]
+}

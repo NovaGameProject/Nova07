@@ -1,0 +1,28 @@
+# CMake generated files
+build/
+out/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.a
+*.dylib
+*.bin
+*.uf2
+*.dis
+
+# IDE-specific files
+.idea/
+.vs/
+.vscode/
+CMakeLists.txt.user*
+*.swp
+*.swo
+.cache
