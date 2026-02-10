@@ -15,6 +15,7 @@ find_package(pugixml CONFIG REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
 find_path(LUABRIDGE3_INCLUDE_DIRS "luabridge3/LuaBridge/Array.h")
 
+
 # Collect all Source Files automatically
 file(GLOB_RECURSE SOURCES
     "src/*.cpp"

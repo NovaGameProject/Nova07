@@ -1,38 +1,53 @@
-// Nova Game Engine
-// Copyright (C) 2026  brambora69123
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+#include "Engine/Renderer.hpp"
+#include "Engine/Window.hpp"
+#include "Engine/TaskScheduler.hpp"
 
-#include "Engine/Nova.hpp"
-#include "Engine/Reflection/LevelLoader.hpp"
-#include <iostream>
+int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;
 
-int main() {
-    using namespace Nova;
+    Nova::Window window("Nova Engine", 1280, 720);
+    Nova::TaskScheduler scheduler;
+    bool running = true;
 
-    // 1. Create the root
-    auto game = std::make_shared<DataModel>();
+    // Use a unique_ptr so we can explicitly kill the renderer
+    // before the window goes out of scope.
+    auto renderer = std::make_unique<Nova::Renderer>(window.GetWindow());
 
-    // 2. Get Services
-    auto workspace = game->GetService<Workspace>();
-    auto lighting = game->GetService<Lighting>();
+    scheduler.AddJob({
+        .name = "Input",
+        .callback = [&](double dt) {
+            (void)dt;
+            if (!window.PollEvents()) running = false;
+            scheduler.ProcessMainThreadTasks();
+        },
+        .priority = 0,
+        .frequency = 0
+    });
 
-    // 3. Create a Part
-    auto brick = std::make_shared<Part>();
-    brick->props.base.get().BrickColor = 21; // Bright Red
-    brick->props.base.get().base.get().Name = "MyFirstBrick";
+    scheduler.AddJob({
+        .name = "Render",
+        .callback = [&](double dt) {
+            (void)dt;
+            if (renderer) renderer->RenderFrame();
+        },
+        .priority = 100,
+        .frequency = 0
+    });
 
-    // 4. Parent it
-    brick->SetParent(workspace);
+    while (running) {
+        scheduler.Step();
+    }
 
-    // 5. Debug Print
-    std::cout << "Successfully created " << brick->props.base.get().base.get().Name.value()
-                  << " inside " << brick->GetName() << std::endl;
+    // --- MANUALLY SHUT DOWN IN ORDER ---
 
-    LevelLoader::Load("resources/test.rbxl", game);
-    LevelLoader::PrintInstanceTree(game);
+    // 1. Kill the renderer first.
+    // This calls ~Renderer, waits for GPU, unclaims window, and destroys device.
+    renderer.reset();
+
+    // 2. Clear scheduler jobs to release any captured references
+    // (This prevents lambdas from holding onto dead pointers)
+    // scheduler.Clear(); // If you add a clear method, or just let it die.
+
     return 0;
+    // 3. window goes out of scope last, calling SDL_DestroyWindow and SDL_Quit.
 }
