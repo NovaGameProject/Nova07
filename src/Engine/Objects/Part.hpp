@@ -11,6 +11,7 @@
 #include <rfl/Field.hpp>
 #include "Engine/Enums/Enums.hpp"
 #include "Engine/Objects/BasePart.hpp"
+#include "Common/BrickColors.hpp"
 namespace Nova {
 
     namespace Props {
@@ -35,8 +36,23 @@ namespace Nova {
             return props.base.get().CFrame.get().to_nova().to_mat4();
         }
 
+        glm::mat3 GetRotation() override {
+            return props.base.get().CFrame.get().to_nova().rotation;
+        }
+
         glm::vec3 GetSize() override {
             return props.base.get().size.to_glm();
+        }
+
+        glm::vec4 GetColor() override {
+            auto& baseProps = props.base.get();
+            glm::vec3 rgb;
+            if (baseProps.Color.has_value()) {
+                rgb = baseProps.Color->to_glm();
+            } else {
+                rgb = BrickColorUtils::ToColor3(baseProps.BrickColor);
+            }
+            return glm::vec4(rgb, 1.0f - baseProps.Transparency);
         }
 
         NOVA_OBJECT(Part, props)

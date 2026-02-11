@@ -10,6 +10,7 @@
 #include "Common/MathTypes.hpp"
 #include "Engine/Objects/Instance.hpp"
 #include <rfl/Flatten.hpp>
+#include <optional>
 
 namespace Nova {
     namespace Props {
@@ -20,6 +21,7 @@ namespace Nova {
             Vector3Reflect size = {4.0f, 1.2f, 2.0f};
             bool Anchored = false;
             bool CanCollide = true;
+            std::optional<Color3Reflect> Color; 
             float Transparency = 0.0f;
             int BrickColor = 194; // Medium Stone Grey
         };
@@ -31,8 +33,7 @@ namespace Nova {
 
         virtual glm::mat4 GetLocalTransform() = 0;
         virtual glm::vec3 GetSize() = 0;
-
-        // BasePart no longer holds its own 'props' or 'raw' pointers.
-        // It's up to Part, Seat, etc. to implement these.
+        virtual glm::vec4 GetColor() = 0; // RGBA
+        virtual glm::mat3 GetRotation() = 0;
     };
 }

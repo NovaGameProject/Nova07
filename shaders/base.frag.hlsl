@@ -1,3 +1,8 @@
-float4 main() : SV_Target {
-    return float4(0.6f, 0.6f, 0.6f, 1.0f);
+struct VSOutput {
+    float4 pos : SV_Position;
+    float4 color : TEXCOORD0;
+};
+
+float4 main(VSOutput input) : SV_Target {
+    return input.color;
 }

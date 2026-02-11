@@ -22,6 +22,14 @@ namespace Nova {
         void Cleanup(SDL_GPUDevice* device);
     };
 
+    struct LightingData {
+        glm::vec4 topAmbient;
+        glm::vec4 bottomAmbient;
+        glm::vec4 lightDir; // w is intensity or unused
+    };
+
+    struct Frustum;
+
     class Renderer {
     public:
         Renderer(SDL_Window* window);
@@ -32,10 +40,13 @@ namespace Nova {
     private:
         struct InstanceData {
             glm::mat4 mvp;
+            glm::mat4 model; // For world-space lighting
+            glm::vec4 color;
         };
 
         void CollectInstances(std::shared_ptr<Instance> instance,
             const glm::mat4& viewProj,
+            const Frustum& frustum,
             std::vector<InstanceData>& outData);
 
         SDL_GPUDevice* device;
@@ -43,6 +54,8 @@ namespace Nova {
         SDL_GPUGraphicsPipeline* basePipeline;
         SDL_GPUBuffer* cubeBuffer;
         SDL_GPUBuffer* instanceBuffer; // New: Storage buffer for matrices
+        SDL_GPUTransferBuffer* instanceTransferBuffer = nullptr;
+
         Framebuffer fb;
 
         std::vector<uint8_t> LoadSPIRV(const std::string& path);

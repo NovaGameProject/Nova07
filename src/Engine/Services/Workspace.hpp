@@ -23,8 +23,9 @@ namespace Nova {
 
         float Gravity = 196.2f;
 
-        // reflect-cpp unsupported:
-        std::weak_ptr<Camera> CurrentCamera;
+        // The active camera, usually resolved from the RBXL file or created on demand
+        std::shared_ptr<Camera> CurrentCamera;
+        
         std::weak_ptr<Instance> PrimaryPart;
 
         Props::WorkspaceProps props;

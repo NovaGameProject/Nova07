@@ -27,15 +27,36 @@ namespace Nova {
         }
 
         void Step() {
-            auto now = std::chrono::high_resolution_clock::now();
+            auto now = std::chrono::steady_clock::now();
             double currentTime = std::chrono::duration<double>(now.time_since_epoch()).count();
 
             for (auto& job : jobs) {
-                double deltaTime = currentTime - job.lastRunTime;
+                if (job.lastRunTime == 0.0) {
+                    job.lastRunTime = currentTime;
+                }
 
-                if (job.frequency <= 0 || deltaTime >= (1.0 / job.frequency)) {
+                double deltaTime = currentTime - job.lastRunTime;
+                if (deltaTime < 0) { // Clock went backwards?
+                    job.lastRunTime = currentTime;
+                    continue;
+                }
+
+                if (job.frequency <= 0) {
                     job.callback(deltaTime);
                     job.lastRunTime = currentTime;
+                } else {
+                    double interval = 1.0 / job.frequency;
+                    int iterations = 0;
+                    while (deltaTime >= interval && iterations < 10) { // Limit catch-up to 10 frames
+                        job.callback(interval);
+                        job.lastRunTime += interval;
+                        deltaTime -= interval;
+                        iterations++;
+                    }
+                    if (deltaTime >= interval) {
+                        // If we are STILL behind after 10 iterations, just skip the rest to avoid death spiral
+                        job.lastRunTime = currentTime;
+                    }
                 }
             }
         }
@@ -60,6 +81,12 @@ namespace Nova {
             for (auto& task : toProcess) {
                 task();
             }
+        }
+
+        void Clear() {
+            std::lock_guard<std::mutex> lock(mtx);
+            jobs.clear();
+            mainThreadQueue.clear();
         }
 
     private:

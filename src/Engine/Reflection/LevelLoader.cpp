@@ -9,6 +9,7 @@
 #include "Engine/Reflection/InstanceFactory.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
 #include "Common/MathTypes.hpp"
+#include <SDL3/SDL_log.h>
 #include <map>
 #include <string>
 #include <pugixml.hpp>
@@ -91,6 +92,28 @@ namespace Nova {
             ProcessItemPass2(item);
         }
 
+        // Finalize: Ensure Workspace has a CurrentCamera
+        if (auto dm = std::dynamic_pointer_cast<DataModel>(dataModel)) {
+            auto workspace = dm->GetService<Workspace>();
+            if (!workspace->CurrentCamera) {
+                // Look for any camera in the children
+                for (auto& child : workspace->GetChildren()) {
+                    if (auto cam = std::dynamic_pointer_cast<Camera>(child)) {
+                        workspace->CurrentCamera = cam;
+                        break;
+                    }
+                }
+
+                // Still no camera? Create one.
+                if (!workspace->CurrentCamera) {
+                    auto cam = std::make_shared<Camera>();
+                    cam->SetParent(workspace);
+                    workspace->CurrentCamera = cam;
+                    SDL_Log("No camera found in file, created default Camera.");
+                }
+            }
+        }
+
         referentMap.clear(); // Clean up memory
     }
 
@@ -168,15 +191,29 @@ namespace Nova {
                 propMap[name] = rfl::Generic(cf);
             }
             else if (type == "Color3") {
-                // stoul handles the large unsigned integer string
-                uint32_t packed = std::stoul(prop.text().get());
                 rfl::Object<rfl::Generic> col;
-
-                // 2007 Format: Usually GBR or RGB packed into the integer
-                // We'll extract as standard RGB bytes
-                col["r"] = rfl::Generic((float)((packed >> 16) & 0xFF) / 255.0f);
-                col["g"] = rfl::Generic((float)((packed >> 8) & 0xFF) / 255.0f);
-                col["b"] = rfl::Generic((float)(packed & 0xFF) / 255.0f);
+                std::string val = prop.text().get();
+                if (val.find(',') != std::string::npos) {
+                    // Float triplet (0.1, 0.5, 0.8)
+                    std::stringstream ss(val);
+                    std::string segment;
+                    float channels[3] = {0,0,0};
+                    for(int i=0; i<3 && std::getline(ss, segment, ','); ++i) {
+                        channels[i] = std::stof(segment);
+                    }
+                    col["r"] = rfl::Generic(channels[0]);
+                    col["g"] = rfl::Generic(channels[1]);
+                    col["b"] = rfl::Generic(channels[2]);
+                } else {
+                    // stoul handles the large unsigned integer string
+                    uint32_t packed = std::stoul(val);
+                    // 2007 Format: Typically (R << 16) | (G << 8) | B
+                    // But if it's a signed negative (like 4278190080 which is 0xFF000000)
+                    // we just mask the bytes.
+                    col["r"] = rfl::Generic((float)((packed >> 16) & 0xFF) / 255.0f);
+                    col["g"] = rfl::Generic((float)((packed >> 8) & 0xFF) / 255.0f);
+                    col["b"] = rfl::Generic((float)(packed & 0xFF) / 255.0f);
+                }
                 propMap[name] = rfl::Generic(col);
             }
         }
@@ -205,11 +242,16 @@ namespace Nova {
 
                 // Handle specific non-reflected references
                 if (propName == "PrimaryPart") {
-                    // Since this isn't in 'props', we might need a manual setter or cast
-                    // Example: if(auto m = dynamic_cast<Model*>(inst.get())) m->primaryPart = target;
+                    if (auto ws = std::dynamic_pointer_cast<Workspace>(inst)) {
+                        ws->PrimaryPart = target;
+                    }
                 }
                 else if (propName == "CurrentCamera") {
-                    // Workspace logic
+                    if (auto ws = std::dynamic_pointer_cast<Workspace>(inst)) {
+                        if (auto cam = std::dynamic_pointer_cast<Camera>(target)) {
+                            ws->CurrentCamera = cam;
+                        }
+                    }
                 }
             }
         }
