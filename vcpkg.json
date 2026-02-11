@@ -6,6 +6,10 @@
       "name": "sdl3",
       "features": ["vulkan"]
     },
+    {
+      "name": "sdl3-image",
+      "features": ["jpeg", "png", "tiff", "webp"]
+    },
     "reflectcpp",
     "luau",
     "luabridge3",

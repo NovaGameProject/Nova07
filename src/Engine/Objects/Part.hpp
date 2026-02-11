@@ -27,32 +27,13 @@ namespace Nova {
     public:
         Props::PartProps props;
         // when Part is used as a Base for SpawnLocation or Seat
-        Part(std::string name) : BasePart(name) {}
+        Part(std::string name) : BasePart(name) {
+            basePartProps = &props.base.get();
+        }
 
         // standalone Part
-        Part() : BasePart("Part") {}
-
-        glm::mat4 GetLocalTransform() override {
-            return props.base.get().CFrame.get().to_nova().to_mat4();
-        }
-
-        glm::mat3 GetRotation() override {
-            return props.base.get().CFrame.get().to_nova().rotation;
-        }
-
-        glm::vec3 GetSize() override {
-            return props.base.get().size.to_glm();
-        }
-
-        glm::vec4 GetColor() override {
-            auto& baseProps = props.base.get();
-            glm::vec3 rgb;
-            if (baseProps.Color.has_value()) {
-                rgb = baseProps.Color->to_glm();
-            } else {
-                rgb = BrickColorUtils::ToColor3(baseProps.BrickColor);
-            }
-            return glm::vec4(rgb, 1.0f - baseProps.Transparency);
+        Part() : BasePart("Part") {
+            basePartProps = &props.base.get();
         }
 
         NOVA_OBJECT(Part, props)

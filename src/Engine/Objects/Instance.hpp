@@ -68,6 +68,28 @@ namespace Nova {
                           << result.error().what() << std::endl; \
             } \
         } \
+        \
+        rfl::Generic GetProperty(const std::string& name) const override { \
+            auto generic = rfl::to_generic<rfl::UnderlyingEnums>(this->PropsMember); \
+            if (auto* obj = std::get_if<rfl::Object<rfl::Generic>>(&generic.variant())) { \
+                if (auto val = obj->get(name)) return *val; \
+            } \
+            return rfl::Generic(); \
+        } \
+        \
+        bool SetProperty(const std::string& name, const rfl::Generic& value) override { \
+            auto generic = rfl::to_generic<rfl::UnderlyingEnums>(this->PropsMember); \
+            if (auto* obj = std::get_if<rfl::Object<rfl::Generic>>(&generic.variant())) { \
+                (*obj)[name] = value; \
+                auto result = rfl::from_generic<decltype(this->PropsMember), rfl::UnderlyingEnums>(generic); \
+                if (result) { \
+                    this->PropsMember = result.value(); \
+                    return true; \
+                } \
+            } \
+            return false; \
+        } \
+        \
         std::string GetName() const override { \
             /* Now we get the whole struct and just pick the Name out of it */ \
             auto& instance = ::Nova::Internal::get_instance_props(this->PropsMember); \
@@ -79,6 +101,8 @@ namespace Nova {
         std::string GetClassName() const override { return #ClassName; } \
         void ApplyPropertiesGeneric(const rfl::Generic& generic) override {} \
         rfl::Generic GetPropertiesGeneric() const override { return rfl::Generic(rfl::Object<rfl::Generic>()); } \
+        rfl::Generic GetProperty(const std::string& name) const override { return rfl::Generic(); } \
+        bool SetProperty(const std::string& name, const rfl::Generic& value) override { return false; } \
         std::string GetName() const override { return m_debugName; }
 
     class Instance : public std::enable_shared_from_this<Instance> {
@@ -90,6 +114,10 @@ namespace Nova {
 
         virtual void ApplyPropertiesGeneric(const rfl::Generic& generic) = 0;
         virtual rfl::Generic GetPropertiesGeneric() const = 0;
+
+        // Automatic Property System
+        virtual rfl::Generic GetProperty(const std::string& name) const = 0;
+        virtual bool SetProperty(const std::string& name, const rfl::Generic& value) = 0;
 
         std::weak_ptr<Instance> parent;
         std::vector<std::shared_ptr<Instance>> children;

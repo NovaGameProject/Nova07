@@ -1,18 +1,14 @@
 #pragma once
 #include "Engine/Objects/Instance.hpp"
 #include "Engine/Services/Workspace.hpp"
+#include "Frustum.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
 
 namespace Nova {
-    // Forward declare vertex to keep header light
     struct Vertex;
-
-    struct SceneUniforms {
-        glm::mat4 mvp;
-    };
 
     struct Framebuffer {
         SDL_GPUTexture* depthTexture = nullptr;
@@ -28,8 +24,6 @@ namespace Nova {
         glm::vec4 lightDir; // w is intensity or unused
     };
 
-    struct Frustum;
-
     class Renderer {
     public:
         Renderer(SDL_Window* window);
@@ -40,8 +34,11 @@ namespace Nova {
     private:
         struct InstanceData {
             glm::mat4 mvp;
-            glm::mat4 model; // For world-space lighting
+            glm::mat4 model;
             glm::vec4 color;
+            // Pack 6 SurfaceType enums (int32 each)
+            int32_t surfaces[6]; // Order: Z+, Z-, X-, X+, Y+, Y- (matching Geometry.hpp)
+            float padding[2];    // Ensure 16-byte alignment
         };
 
         void CollectInstances(std::shared_ptr<Instance> instance,
@@ -53,8 +50,11 @@ namespace Nova {
         SDL_Window* window;
         SDL_GPUGraphicsPipeline* basePipeline;
         SDL_GPUBuffer* cubeBuffer;
-        SDL_GPUBuffer* instanceBuffer; // New: Storage buffer for matrices
+        SDL_GPUBuffer* instanceBuffer;
         SDL_GPUTransferBuffer* instanceTransferBuffer = nullptr;
+
+        SDL_GPUTexture* surfaceTexture = nullptr;
+        SDL_GPUSampler* surfaceSampler = nullptr;
 
         Framebuffer fb;
 

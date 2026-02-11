@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Find packages (via vcpkg)
 find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(unofficial-luau CONFIG REQUIRED)
@@ -36,6 +37,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
+    SDL3_image::SDL3_image
     reflectcpp::reflectcpp
     glm::glm
     Jolt::Jolt

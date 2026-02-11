@@ -4,6 +4,7 @@
 #include "Engine/TaskScheduler.hpp"
 #include "Engine/Nova.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
+#include <SDL3_image/SDL_image.h>
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -138,7 +139,6 @@ int main(int argc, char* argv[]) {
     // This calls ~Renderer, waits for GPU, unclaims window, and destroys device.
     renderer.reset();
 
-    // 2. Clear scheduler jobs to release any captured references
     // (This prevents lambdas from holding onto dead pointers)
     scheduler.Clear(); 
 
