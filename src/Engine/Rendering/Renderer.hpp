@@ -28,17 +28,21 @@ namespace Nova {
         ~Renderer();
 
         void RenderFrame(std::shared_ptr<Workspace> root);
-        void SubmitInstance(std::shared_ptr<Instance> instance,
-            const glm::mat4& parentTransform,
-            const glm::mat4& viewProj,
-            SDL_GPUCommandBuffer* cmd,
-            SDL_GPURenderPass* pass);
 
     private:
+        struct InstanceData {
+            glm::mat4 mvp;
+        };
+
+        void CollectInstances(std::shared_ptr<Instance> instance,
+            const glm::mat4& viewProj,
+            std::vector<InstanceData>& outData);
+
         SDL_GPUDevice* device;
         SDL_Window* window;
         SDL_GPUGraphicsPipeline* basePipeline;
         SDL_GPUBuffer* cubeBuffer;
+        SDL_GPUBuffer* instanceBuffer; // New: Storage buffer for matrices
         Framebuffer fb;
 
         std::vector<uint8_t> LoadSPIRV(const std::string& path);

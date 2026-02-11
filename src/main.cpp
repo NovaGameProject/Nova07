@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     auto workspace = game->GetService<Nova::Workspace>();
 
     // Load the world from a file
-    Nova::LevelLoader::Load("./resources/Places/HappyHomeInRobloxia.rbxl", game);
+    Nova::LevelLoader::Load("./resources/Places/RobloxHQ.rbxl", game);
 
     // MOVE CAMERA OUT OF THE FLOOR (Baseplate is at 0, size 512,8,512 -> y range -4 to 4)
     {

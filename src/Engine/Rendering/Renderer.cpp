@@ -11,7 +11,6 @@
 
 namespace Nova {
 
-    // Helper to find the active camera anywhere in the hierarchy
     static std::shared_ptr<Camera> FindCameraRecursive(std::shared_ptr<Instance> inst) {
         if (!inst) return nullptr;
         if (auto cam = std::dynamic_pointer_cast<Camera>(inst)) return cam;
@@ -23,7 +22,6 @@ namespace Nova {
 
     void Framebuffer::Refresh(SDL_GPUDevice* device, uint32_t w, uint32_t h) {
         if (w == width && h == height && depthTexture != nullptr) return;
-
         if (depthTexture) SDL_ReleaseGPUTexture(device, depthTexture);
 
         SDL_GPUTextureCreateInfo info = {
@@ -48,6 +46,14 @@ namespace Nova {
     Renderer::Renderer(SDL_Window* window) : window(window) {
         device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, nullptr);
         SDL_ClaimWindowForGPUDevice(device, window);
+
+        // Pre-allocate instance buffer for up to 16,384 parts
+        SDL_GPUBufferCreateInfo iInfo = {
+            .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
+            .size = 16384 * sizeof(InstanceData)
+        };
+        instanceBuffer = SDL_CreateGPUBuffer(device, &iInfo);
+
         InitPipelines();
         CreateCubeResources();
     }
@@ -55,8 +61,27 @@ namespace Nova {
     Renderer::~Renderer() {
         SDL_ReleaseGPUGraphicsPipeline(device, basePipeline);
         SDL_ReleaseGPUBuffer(device, cubeBuffer);
+        SDL_ReleaseGPUBuffer(device, instanceBuffer);
         fb.Cleanup(device);
         SDL_DestroyGPUDevice(device);
+    }
+
+    void Renderer::CollectInstances(
+        std::shared_ptr<Instance> instance,
+        const glm::mat4& viewProj,
+        std::vector<InstanceData>& outData
+    ) {
+        if (!instance) return;
+
+        if (auto physical = std::dynamic_pointer_cast<BasePart>(instance)) {
+            glm::mat4 worldMatrix = physical->GetLocalTransform();
+            glm::mat4 scaledMatrix = glm::scale(worldMatrix, physical->GetSize());
+            outData.push_back({ viewProj * scaledMatrix });
+        }
+
+        for (auto& child : instance->GetChildren()) {
+            CollectInstances(child, viewProj, outData);
+        }
     }
 
     void Renderer::RenderFrame(std::shared_ptr<Workspace> workspace) {
@@ -67,32 +92,63 @@ namespace Nova {
         if (SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchainTexture, &w, &h)) {
             fb.Refresh(device, w, h);
 
-            // 1. Find the Camera
             std::shared_ptr<Camera> activeCamera = FindCameraRecursive(workspace);
-
-            // 2. Math
-            float fov = glm::radians(70.0f);
             float aspect = (float)w / (float)h;
-
-            glm::mat4 proj = glm::perspective(fov, aspect, 0.1f, 1000.0f);
+            glm::mat4 proj = glm::perspective(glm::radians(70.0f), aspect, 0.1f, 10000.0f);
 
             glm::mat4 view = glm::mat4(1.0f);
             if (activeCamera) {
                 view = activeCamera->GetViewMatrix();
-
-                auto cf = activeCamera->props.CFrame.get().to_nova();
-                static int frameCount = 0;
-                if (frameCount++ % 60 == 0) {
-                    SDL_Log("Active Camera: %s at (%.2f, %.2f, %.2f)",
-                        activeCamera->GetName().c_str(), cf.position.x, cf.position.y, cf.position.z);
-                }
             } else {
                 view = glm::lookAt(glm::vec3(50, 50, 50), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
             }
 
             glm::mat4 viewProj = proj * view;
 
-            // 3. Render Pass (Explicit initialization matching working snippet)
+                        // 1. Collect all instance data
+
+                        std::vector<InstanceData> instances;
+
+                        instances.reserve(2000); 
+
+                        CollectInstances(workspace, viewProj, instances);
+
+            
+
+                        static int frameCount = 0;
+
+                        if (frameCount % 60 == 0) {
+
+                            SDL_Log("Rendering %zu instances", instances.size());
+
+                        }
+
+                        frameCount++;
+
+            
+
+                        if (!instances.empty()) {
+
+            
+                // 2. Upload to storage buffer (using cycling to avoid data dependency)
+                uint32_t dataSize = instances.size() * sizeof(InstanceData);
+                SDL_GPUTransferBufferCreateInfo tInfo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = dataSize };
+                auto tBuf = SDL_CreateGPUTransferBuffer(device, &tInfo);
+
+                void* data = SDL_MapGPUTransferBuffer(device, tBuf, false);
+                std::memcpy(data, instances.data(), dataSize);
+                SDL_UnmapGPUTransferBuffer(device, tBuf);
+
+                auto copyCmd = SDL_BeginGPUCopyPass(cmd);
+                SDL_GPUTransferBufferLocation src = { tBuf, 0 };
+                SDL_GPUBufferRegion dst = { instanceBuffer, 0, dataSize };
+                SDL_UploadToGPUBuffer(copyCmd, &src, &dst, true); // Cycle=true for large updates
+                SDL_EndGPUCopyPass(copyCmd);
+
+                SDL_ReleaseGPUTransferBuffer(device, tBuf);
+            }
+
+            // 3. Render Pass
             SDL_GPUColorTargetInfo colorTarget = {};
             colorTarget.texture = swapchainTexture;
             colorTarget.clear_color = { 0.1f, 0.1f, 0.2f, 1.0f };
@@ -107,11 +163,16 @@ namespace Nova {
 
             auto pass = SDL_BeginGPURenderPass(cmd, &colorTarget, 1, &depthTarget);
             {
-                SDL_BindGPUGraphicsPipeline(pass, basePipeline);
-                SDL_GPUBufferBinding binding = { .buffer = cubeBuffer, .offset = 0 };
-                SDL_BindGPUVertexBuffers(pass, 0, &binding, 1);
+                if (!instances.empty()) {
+                    SDL_BindGPUGraphicsPipeline(pass, basePipeline);
 
-                SubmitInstance(workspace, glm::mat4(1.0f), viewProj, cmd, pass);
+                    SDL_GPUBufferBinding vBinding = { .buffer = cubeBuffer, .offset = 0 };
+                    SDL_BindGPUVertexBuffers(pass, 0, &vBinding, 1);
+
+                    SDL_BindGPUVertexStorageBuffers(pass, 0, &instanceBuffer, 1);
+
+                    SDL_DrawGPUPrimitives(pass, 36, instances.size(), 0, 0);
+                }
             }
             SDL_EndGPURenderPass(pass);
             SDL_SubmitGPUCommandBuffer(cmd);
@@ -143,15 +204,15 @@ namespace Nova {
             .stage = SDL_GPU_SHADERSTAGE_VERTEX,
             .num_samplers = 0,
             .num_storage_textures = 0,
-            .num_storage_buffers = 0,
-            .num_uniform_buffers = 2
+            .num_storage_buffers = 1, // Space 0, Slot 0
+            .num_uniform_buffers = 0
         };
 
         SDL_GPUShaderCreateInfo fInfo = vInfo;
         fInfo.code_size = fCode.size();
         fInfo.code = fCode.data();
         fInfo.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
-        fInfo.num_uniform_buffers = 0;
+        fInfo.num_storage_buffers = 0;
 
         SDL_GPUShader* vShader = SDL_CreateGPUShader(device, &vInfo);
         SDL_GPUShader* fShader = SDL_CreateGPUShader(device, &fInfo);
@@ -181,6 +242,9 @@ namespace Nova {
         pInfo.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
 
         basePipeline = SDL_CreateGPUGraphicsPipeline(device, &pInfo);
+        if (!basePipeline) {
+            SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "Failed to create graphics pipeline!");
+        }
 
         SDL_ReleaseGPUShader(device, vShader);
         SDL_ReleaseGPUShader(device, fShader);
@@ -211,28 +275,5 @@ namespace Nova {
         SDL_WaitForGPUFences(device, true, &fence, 1);
         SDL_ReleaseGPUFence(device, fence);
         SDL_ReleaseGPUTransferBuffer(device, tBuf);
-    }
-
-    void Renderer::SubmitInstance(
-        std::shared_ptr<Instance> instance,
-        const glm::mat4& parentTransform,
-        const glm::mat4& viewProj,
-        SDL_GPUCommandBuffer* cmd,
-        SDL_GPURenderPass* pass
-    ) {
-        if (!instance) return;
-
-        if (auto physical = std::dynamic_pointer_cast<BasePart>(instance)) {
-            glm::mat4 worldMatrix = physical->GetLocalTransform();
-            glm::mat4 scaledMatrix = glm::scale(worldMatrix, physical->GetSize());
-
-            SceneUniforms ub = { viewProj * scaledMatrix };
-            SDL_PushGPUVertexUniformData(cmd, 1, &ub, sizeof(SceneUniforms));
-            SDL_DrawGPUPrimitives(pass, 36, 1, 0, 0);
-        }
-
-        for (auto& child : instance->GetChildren()) {
-            SubmitInstance(child, glm::mat4(1.0f), viewProj, cmd, pass);
-        }
     }
 }
