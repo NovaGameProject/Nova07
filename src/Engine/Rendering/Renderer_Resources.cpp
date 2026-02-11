@@ -99,4 +99,144 @@ namespace Nova {
         SDL_ReleaseGPUTransferBuffer(device, tBuf);
         SDL_ReleaseGPUTransferBuffer(device, ltBuf);
     }
+
+    void Renderer::UpdateSkybox(std::shared_ptr<Workspace> workspace) {
+        std::shared_ptr<Sky> sky = nullptr;
+        
+        // Find Sky in Lighting (standard location)
+        if (auto parent = workspace->GetParent()) {
+            for (auto& child : parent->GetChildren()) {
+                if (auto lighting = std::dynamic_pointer_cast<Lighting>(child)) {
+                    for (auto& lChild : lighting->GetChildren()) {
+                        if (auto s = std::dynamic_pointer_cast<Sky>(lChild)) {
+                            sky = s;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!sky) {
+            return;
+        }
+
+        bool changed = false;
+        std::string newPaths[6] = {
+            sky->props.SkyboxRt, sky->props.SkyboxLf,
+            sky->props.SkyboxUp, sky->props.SkyboxDn,
+            sky->props.SkyboxBk, sky->props.SkyboxFt
+        };
+
+        if (currentSkyboxPaths[0].empty()) changed = true; // Initial load
+
+        for (int i = 0; i < 6; i++) {
+            if (newPaths[i] != currentSkyboxPaths[i]) {
+                changed = true;
+                break;
+            }
+        }
+
+        if (changed) {
+            SDL_Log("Skybox changed or initializing...");
+            std::vector<std::string> paths;
+            for (int i = 0; i < 6; i++) {
+                currentSkyboxPaths[i] = newPaths[i];
+                std::string path = newPaths[i];
+                if (path.starts_with("rbxasset://textures/sky/")) {
+                    path = "resources/sky/" + path.substr(24);
+                }
+                paths.push_back(path);
+                SDL_Log("  Face %d: %s", i, path.c_str());
+            }
+            LoadSkyboxTexture(paths);
+        }
+    }
+
+    void Renderer::LoadSkyboxTexture(const std::vector<std::string>& paths) {
+        if (paths.size() < 6) return;
+
+        SDL_Surface* surfaces[6];
+        bool success = true;
+        for (int i = 0; i < 6; i++) {
+            surfaces[i] = IMG_Load(paths[i].c_str());
+            if (!surfaces[i]) {
+                SDL_Log("Failed to load skybox texture %s: %s", paths[i].c_str(), SDL_GetError());
+                success = false;
+            } else {
+                SDL_Surface* rgba = SDL_ConvertSurface(surfaces[i], SDL_PIXELFORMAT_RGBA32);
+                SDL_DestroySurface(surfaces[i]);
+                surfaces[i] = rgba;
+            }
+        }
+
+        if (!success) {
+            SDL_Log("Skybox loading failed due to missing textures.");
+            for (int i = 0; i < 6; i++) if (surfaces[i]) SDL_DestroySurface(surfaces[i]);
+            return;
+        }
+
+        if (skyboxTexture) SDL_ReleaseGPUTexture(device, skyboxTexture);
+
+        SDL_GPUTextureCreateInfo texInfo = {
+            .type = SDL_GPU_TEXTURETYPE_CUBE,
+            .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+            .width = (uint32_t)surfaces[0]->w,
+            .height = (uint32_t)surfaces[0]->h,
+            .layer_count_or_depth = 6,
+            .num_levels = 1
+        };
+        skyboxTexture = SDL_CreateGPUTexture(device, &texInfo);
+
+        uint32_t layerSize = surfaces[0]->w * surfaces[0]->h * 4;
+        SDL_GPUTransferBufferCreateInfo ltInfo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = layerSize * 6 };
+        auto ltBuf = SDL_CreateGPUTransferBuffer(device, &ltInfo);
+        uint8_t* texData = (uint8_t*)SDL_MapGPUTransferBuffer(device, ltBuf, false);
+
+        uint32_t width = (uint32_t)surfaces[0]->w;
+        uint32_t height = (uint32_t)surfaces[0]->h;
+
+        for (int i = 0; i < 6; i++) {
+            std::memcpy(texData + (i * layerSize), surfaces[i]->pixels, layerSize);
+            
+            if (i == 2 || i == 3) {
+                uint32_t* pixels = (uint32_t*)(texData + (i * layerSize));
+                std::vector<uint32_t> temp(width * height);
+                std::memcpy(temp.data(), pixels, layerSize);
+                
+                for (uint32_t y = 0; y < height; y++) {
+                    for (uint32_t x = 0; x < width; x++) {
+                        uint32_t srcIdx = y * width + x;
+                        uint32_t dstIdx;
+                        
+                        if (i == 3) { // Bottom: 90 degrees clockwise
+                            dstIdx = x * width + (width - 1 - y);
+                        } else { // Top: 90 degrees counter-clockwise
+                            dstIdx = (width - 1 - x) * width + y;
+                        }
+                        
+                        pixels[dstIdx] = temp[srcIdx];
+                    }
+                }
+            }
+            
+            SDL_DestroySurface(surfaces[i]);
+        }
+        SDL_UnmapGPUTransferBuffer(device, ltBuf);
+
+        auto cmd = SDL_AcquireGPUCommandBuffer(device);
+        auto copy = SDL_BeginGPUCopyPass(cmd);
+        for (uint32_t i = 0; i < 6; i++) {
+            SDL_GPUTextureTransferInfo texSrc = { ltBuf, layerSize * i };
+            SDL_GPUTextureRegion texDst = { skyboxTexture, 0, i, 0, 0, 0, width, height, 1 };
+            SDL_UploadToGPUTexture(copy, &texSrc, &texDst, false);
+        }
+        SDL_EndGPUCopyPass(copy);
+        auto fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+        SDL_WaitForGPUFences(device, true, &fence, 1);
+        SDL_ReleaseGPUFence(device, fence);
+        SDL_ReleaseGPUTransferBuffer(device, ltBuf);
+        SDL_Log("Skybox cubemap created successfully (%dx%d).", width, height);
+    }
 }

@@ -72,6 +72,8 @@ namespace Nova {
     }
 
     Renderer::~Renderer() {
+        if (skyboxPipeline) SDL_ReleaseGPUGraphicsPipeline(device, skyboxPipeline);
+        if (skyboxTexture) SDL_ReleaseGPUTexture(device, skyboxTexture);
         SDL_ReleaseGPUGraphicsPipeline(device, basePipeline);
         SDL_ReleaseGPUBuffer(device, cubeBuffer);
         SDL_ReleaseGPUBuffer(device, instanceBuffer);
@@ -126,6 +128,7 @@ namespace Nova {
 
         if (SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchainTexture, &w, &h)) {
             fb.Refresh(device, w, h);
+            UpdateSkybox(workspace);
 
             float aspect = (float)w / (float)h;
             glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(70.0f), aspect, 0.1f, 10000.0f);
@@ -213,6 +216,26 @@ namespace Nova {
             depthTarget.store_op = SDL_GPU_STOREOP_DONT_CARE;
 
             auto pass = SDL_BeginGPURenderPass(cmd, &colorTarget, 1, &depthTarget);
+
+            if (skyboxPipeline && skyboxTexture) {
+                SDL_BindGPUGraphicsPipeline(pass, skyboxPipeline);
+                
+                // View matrix without translation
+                // HLSL mul(mvp, pos) with column_major expects the same layout as GLM
+                glm::mat4 skyView = glm::mat4(glm::mat3(view));
+                glm::mat4 skyMVP = proj * skyView;
+                
+                SDL_PushGPUVertexUniformData(cmd, 0, &skyMVP, sizeof(glm::mat4));
+                
+                SDL_GPUTextureSamplerBinding skyBinding = { .texture = skyboxTexture, .sampler = surfaceSampler };
+                SDL_BindGPUFragmentSamplers(pass, 0, &skyBinding, 1);
+
+                SDL_GPUBufferBinding vBinding = { .buffer = cubeBuffer, .offset = 0 };
+                SDL_BindGPUVertexBuffers(pass, 0, &vBinding, 1);
+                
+                SDL_DrawGPUPrimitives(pass, 36, 1, 0, 0);
+            }
+
             if (!instances.empty()) {
                 SDL_BindGPUGraphicsPipeline(pass, basePipeline);
                 SDL_GPUBufferBinding vBinding = { .buffer = cubeBuffer, .offset = 0 };

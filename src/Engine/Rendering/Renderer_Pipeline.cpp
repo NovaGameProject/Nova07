@@ -84,5 +84,53 @@ namespace Nova {
         basePipeline = SDL_CreateGPUGraphicsPipeline(device, &pInfo);
         SDL_ReleaseGPUShader(device, vShader);
         SDL_ReleaseGPUShader(device, fShader);
+        SDL_Log("Base pipeline initialized.");
+
+        // Skybox Pipeline
+        auto skyVCode = LoadSPIRV("shaders/skybox.vert.spv");
+        auto skyFCode = LoadSPIRV("shaders/skybox.frag.spv");
+
+        if (!skyVCode.empty() && !skyFCode.empty()) {
+            SDL_Log("Skybox shaders loaded (%zu, %zu bytes).", skyVCode.size(), skyFCode.size());
+            SDL_GPUShaderCreateInfo skyVInfo = {
+                .code_size = skyVCode.size(),
+                .code = skyVCode.data(),
+                .entrypoint = "main",
+                .format = SDL_GPU_SHADERFORMAT_SPIRV,
+                .stage = SDL_GPU_SHADERSTAGE_VERTEX,
+                .num_uniform_buffers = 1 // MVP
+            };
+            SDL_GPUShaderCreateInfo skyFInfo = {
+                .code_size = skyFCode.size(),
+                .code = skyFCode.data(),
+                .entrypoint = "main",
+                .format = SDL_GPU_SHADERFORMAT_SPIRV,
+                .stage = SDL_GPU_SHADERSTAGE_FRAGMENT,
+                .num_samplers = 1 // Cubemap
+            };
+
+            SDL_GPUShader* skyVShader = SDL_CreateGPUShader(device, &skyVInfo);
+            SDL_GPUShader* skyFShader = SDL_CreateGPUShader(device, &skyFInfo);
+
+            SDL_GPUGraphicsPipelineCreateInfo skyPInfo = pInfo;
+            skyPInfo.vertex_shader = skyVShader;
+            skyPInfo.fragment_shader = skyFShader;
+            skyPInfo.depth_stencil_state.enable_depth_write = false;
+            skyPInfo.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
+            skyPInfo.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+
+            skyboxPipeline = SDL_CreateGPUGraphicsPipeline(device, &skyPInfo);
+            if (skyboxPipeline) {
+                SDL_Log("Skybox pipeline created successfully.");
+            } else {
+                SDL_Log("Failed to create skybox pipeline: %s", SDL_GetError());
+            }
+
+            SDL_ReleaseGPUShader(device, skyVShader);
+            SDL_ReleaseGPUShader(device, skyFShader);
+        } else {
+            skyboxPipeline = nullptr;
+            SDL_Log("Skybox shaders not found (expected shaders/skybox.vert.spv and shaders/skybox.frag.spv). Skybox will be disabled.");
+        }
     }
 }

@@ -4,7 +4,7 @@
 #include "Engine/TaskScheduler.hpp"
 #include "Engine/Nova.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
-#include "Engine/Services/PhysicsService.hpp"
+#include "Engine/Objects/Sky.hpp"
 #include <SDL3_image/SDL_image.h>
 #include <tracy/Tracy.hpp>
 
@@ -32,6 +32,20 @@ int main(int argc, char* argv[]) {
             lighting->props.ClearColor = { 132/255.0f, 177/255.0f, 248/255.0f };
             lighting->props.TopAmbientV9 = { 0.5f, 0.5f, 0.5f };
             lighting->props.BottomAmbientV9 = { 0.2f, 0.2f, 0.2f };
+        }
+
+        // Add default Sky if none exists
+        bool hasSky = false;
+        for (auto& child : lighting->GetChildren()) {
+            if (std::dynamic_pointer_cast<Nova::Sky>(child)) {
+                hasSky = true;
+                break;
+            }
+        }
+        if (!hasSky) {
+            auto sky = std::make_shared<Nova::Sky>();
+            sky->SetParent(lighting);
+            SDL_Log("Added default Sky instance.");
         }
     }
 

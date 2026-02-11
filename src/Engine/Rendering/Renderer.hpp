@@ -45,15 +45,22 @@ namespace Nova {
             const Frustum& frustum,
             std::vector<InstanceData>& outData);
 
+        void UpdateSkybox(std::shared_ptr<Workspace> workspace);
+        void LoadSkyboxTexture(const std::vector<std::string>& paths);
+
         SDL_GPUDevice* device;
         SDL_Window* window;
         SDL_GPUGraphicsPipeline* basePipeline;
+        SDL_GPUGraphicsPipeline* skyboxPipeline;
         SDL_GPUBuffer* cubeBuffer;
         SDL_GPUBuffer* instanceBuffer;
         SDL_GPUTransferBuffer* instanceTransferBuffer = nullptr;
 
         SDL_GPUTexture* surfaceTexture = nullptr;
         SDL_GPUSampler* surfaceSampler = nullptr;
+
+        SDL_GPUTexture* skyboxTexture = nullptr;
+        std::string currentSkyboxPaths[6];
 
         Framebuffer fb;
 
