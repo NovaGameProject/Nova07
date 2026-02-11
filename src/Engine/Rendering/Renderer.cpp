@@ -288,10 +288,13 @@ namespace Nova {
         pInfo.depth_stencil_state.enable_depth_write = true;
         pInfo.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
 
-        SDL_GPUVertexAttribute attr = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0 };
+        SDL_GPUVertexAttribute attrs[2];
+        attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0 }; // Position
+        attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, sizeof(Vector3) }; // Normal
+
         SDL_GPUVertexBufferDescription desc = { 0, sizeof(Vertex), SDL_GPU_VERTEXINPUTRATE_VERTEX, 0 };
-        pInfo.vertex_input_state.num_vertex_attributes = 1;
-        pInfo.vertex_input_state.vertex_attributes = &attr;
+        pInfo.vertex_input_state.num_vertex_attributes = 2;
+        pInfo.vertex_input_state.vertex_attributes = attrs;
         pInfo.vertex_input_state.num_vertex_buffers = 1;
         pInfo.vertex_input_state.vertex_buffer_descriptions = &desc;
 

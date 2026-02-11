@@ -1,5 +1,6 @@
 struct VSInput {
     [[vk::location(0)]] float3 pos : TEXCOORD0;
+    [[vk::location(1)]] float3 normal : TEXCOORD1;
 };
 
 // std140 alignment: vec4 is 16 bytes, which matches float4
@@ -37,22 +38,17 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID) {
     // 1. Position (MVP is P * V * M)
     output.pos = mul(data.mvp, float4(input.pos, 1.0f));
 
-    // 2. Normal Calculation (for unit cube -0.5 to 0.5)
-    float3 localNormal = float3(0, 0, 0);
-    float3 absPos = abs(input.pos);
-    if (absPos.x > absPos.y && absPos.x > absPos.z) localNormal.x = sign(input.pos.x);
-    else if (absPos.y > absPos.z) localNormal.y = sign(input.pos.y);
-    else localNormal.z = sign(input.pos.z);
-
-    // Transform normal to world space using the upper-left 3x3 of the model matrix
+    // 2. Transform normal to world space using the upper-left 3x3 of the model matrix
     float3x3 normalMatrix = (float3x3)data.model;
-    float3 N = normalize(mul(normalMatrix, localNormal));
+    float3 N = normalize(mul(normalMatrix, input.normal));
     float3 L = normalize(lighting.lightDir.xyz);
     
     // 3. Shading (Classic 2007)
+    // Simple Lambertian diffuse
     float diffuse = max(0.0, dot(N, L));
     
     // Mix top and bottom ambient based on normal Y in world space
+    // Standard Roblox 2007 look uses a hemispherical ambient
     float ambientWeight = N.y * 0.5 + 0.5;
     float3 ambient = lerp(lighting.bottomAmbient.rgb, lighting.topAmbient.rgb, ambientWeight);
     
