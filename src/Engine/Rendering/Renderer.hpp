@@ -21,7 +21,7 @@ namespace Nova {
     struct LightingData {
         glm::vec4 topAmbient;
         glm::vec4 bottomAmbient;
-        glm::vec4 lightDir; // w is intensity or unused
+        glm::vec4 lightDir;
     };
 
     class Renderer {
@@ -29,19 +29,18 @@ namespace Nova {
         Renderer(SDL_Window* window);
         ~Renderer();
 
-        void RenderFrame(std::shared_ptr<Workspace> root);
-
-    private:
         struct InstanceData {
             glm::mat4 mvp;
             glm::mat4 model;
             glm::vec4 color;
-            // Pack 6 SurfaceType enums (int32 each)
-            int32_t surfaces[6]; // Order: Z+, Z-, X-, X+, Y+, Y- (matching Geometry.hpp)
-            float padding[2];    // Ensure 16-byte alignment
+            glm::vec4 scale;
+            int32_t surfaces[8];
         };
 
-        void CollectInstances(std::shared_ptr<Instance> instance,
+        void RenderFrame(std::shared_ptr<Workspace> root);
+
+    private:
+        void CollectInstances(std::shared_ptr<Workspace> workspace,
             const glm::mat4& viewProj,
             const Frustum& frustum,
             std::vector<InstanceData>& outData);

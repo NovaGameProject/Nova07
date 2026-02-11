@@ -28,6 +28,22 @@ namespace Nova {
         
         std::weak_ptr<Instance> PrimaryPart;
 
+        // High-performance cache for the renderer
+        std::vector<std::shared_ptr<BasePart>> cachedParts;
+
+        void RefreshCachedParts() {
+            cachedParts.clear();
+            auto findParts = [&](auto& self, std::shared_ptr<Instance> inst) -> void {
+                if (auto bp = std::dynamic_pointer_cast<BasePart>(inst)) {
+                    cachedParts.push_back(bp);
+                }
+                for (auto& child : inst->GetChildren()) {
+                    self(self, child);
+                }
+            };
+            findParts(findParts, shared_from_this());
+        }
+
         Props::WorkspaceProps props;
         NOVA_OBJECT(Workspace, props)
 

@@ -1,7 +1,6 @@
 struct VSInput {
     [[vk::location(0)]] float3 pos : TEXCOORD0;
     [[vk::location(1)]] float3 normal : TEXCOORD1;
-    [[vk::location(2)]] float2 uv : TEXCOORD2;
 };
 
 struct LightingData {
@@ -26,8 +25,8 @@ struct InstanceData {
     column_major float4x4 mvp;
     column_major float4x4 model;
     float4 color;
-    int surfaces[6]; // Z+, Z-, X-, X+, Y+, Y-
-    float2 padding;
+    float4 scale;    // Explicit scale passed from CPU
+    int surfaces[8]; // 6 indices + 2 padding
 };
 
 StructuredBuffer<InstanceData> instanceData : register(t0, space0);
@@ -36,33 +35,36 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID, uint vertexID : SV
     VSOutput output;
     InstanceData data = instanceData[instanceID];
 
-    float4 worldPos = mul(data.model, float4(input.pos, 1.0f));
     output.pos = mul(data.mvp, float4(input.pos, 1.0f));
     
     // Determine which surface this is (Z+, Z-, X-, X+, Y+, Y-)
     uint faceIdx = vertexID / 6;
     output.surfaceIndex = uint(data.surfaces[faceIdx]);
 
+    // Calculate UVs using explicit scale to prevent stretching on rotated parts.
+    float2 uv = float2(0, 0);
+    float2 uvScale = float2(1, 1);
+
+    if (faceIdx == 0 || faceIdx == 1) { // Z faces (Front/Back)
+        uv = input.pos.xy;
+        uvScale = data.scale.xy;
+    } else if (faceIdx == 2 || faceIdx == 3) { // X faces (Left/Right)
+        uv = float2(input.pos.z, input.pos.y);
+        uvScale = data.scale.zy;
+    } else { // Y faces (Top/Bottom)
+        uv = input.pos.xz;
+        uvScale = data.scale.xz;
+    }
+
+    // Offset to [0, 1] and apply scale.
+    // Multiplying by 0.5f doubles the size of the texture (half as many repetitions).
+    output.uv = (uv + 0.5f) * uvScale * 0.5f;
+
     // Shading
     float3x3 normalMatrix = (float3x3)data.model;
     float3 N = normalize(mul(normalMatrix, input.normal));
     float3 L = normalize(lighting.lightDir.xyz);
     
-    // World-Space UV Projection
-    float3 absN = abs(N);
-    float2 worldUV = float2(0, 0);
-    
-    if (absN.y > absN.x && absN.y > absN.z) {
-        worldUV = worldPos.xz;
-    } else if (absN.x > absN.y && absN.x > absN.z) {
-        worldUV = float2(worldPos.z, worldPos.y);
-    } else {
-        worldUV = float2(worldPos.x, worldPos.y);
-    }
-    
-    // Scale UVs back to 0.5f as requested.
-    output.uv = worldUV * 0.5f;
-
     float diffuse = max(0.0, dot(N, L));
     float ambientWeight = N.y * 0.5 + 0.5;
     float3 ambient = lerp(lighting.bottomAmbient.rgb, lighting.topAmbient.rgb, ambientWeight);

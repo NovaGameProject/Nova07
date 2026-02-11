@@ -9,6 +9,7 @@
 #include "Engine/Reflection/InstanceFactory.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
 #include "Common/MathTypes.hpp"
+#include "Engine/Services/PhysicsService.hpp"
 #include <SDL3/SDL_log.h>
 #include <map>
 #include <string>
@@ -16,6 +17,16 @@
 #include "Engine/Nova.hpp"
 
 namespace Nova {
+
+    // Helper to find all BaseParts in a tree
+    void FindAllBaseParts(std::shared_ptr<Instance> inst, std::vector<std::shared_ptr<BasePart>>& out) {
+        if (auto bp = std::dynamic_pointer_cast<BasePart>(inst)) {
+            out.push_back(bp);
+        }
+        for (auto& child : inst->GetChildren()) {
+            FindAllBaseParts(child, out);
+        }
+    }
 
     // This map stores <ReferentID, InstancePointer>
     // Example: <"RBX0", shared_ptr<Part>>
@@ -112,6 +123,14 @@ namespace Nova {
                     SDL_Log("No camera found in file, created default Camera.");
                 }
             }
+
+            // Register all physical parts into the PhysicsService
+            auto physics = dm->GetService<PhysicsService>();
+            std::vector<std::shared_ptr<BasePart>> parts;
+            FindAllBaseParts(dm, parts);
+            SDL_Log("Registering %zu parts with PhysicsService", parts.size());
+            physics->BulkRegisterParts(parts);
+            workspace->RefreshCachedParts();
         }
 
         referentMap.clear(); // Clean up memory

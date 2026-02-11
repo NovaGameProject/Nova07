@@ -9,6 +9,7 @@
 #include <SDL3/SDL_log.h>
 #include <cstring>
 #include <algorithm>
+#include <tracy/Tracy.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -82,14 +83,17 @@ namespace Nova {
     }
 
     void Renderer::CollectInstances(
-        std::shared_ptr<Instance> instance,
+        std::shared_ptr<Workspace> workspace,
         const glm::mat4& viewProj,
         const Frustum& frustum,
         std::vector<InstanceData>& outData
     ) {
-        if (!instance) return;
+        glm::vec3 cameraPos(0, 0, 0);
+        if (workspace->CurrentCamera) {
+            cameraPos = workspace->CurrentCamera->props.CFrame.get().to_nova().position;
+        }
 
-        if (auto physical = std::dynamic_pointer_cast<BasePart>(instance)) {
+        for (auto& physical : workspace->cachedParts) {
             glm::mat4 worldMatrix = physical->GetLocalTransform();
             glm::vec3 size = physical->GetSize();
             glm::vec3 worldPos = glm::vec3(worldMatrix[3]);
@@ -102,18 +106,16 @@ namespace Nova {
                     viewProj * scaledMatrix,
                     scaledMatrix,
                     physical->GetColor(),
+                    glm::vec4(size, 1.0f),
                     {
                         (int32_t)bp->FrontSurface, (int32_t)bp->BackSurface,
                         (int32_t)bp->LeftSurface, (int32_t)bp->RightSurface,
-                        (int32_t)bp->TopSurface, (int32_t)bp->BottomSurface
+                        (int32_t)bp->TopSurface, (int32_t)bp->BottomSurface,
+                        0, 0 // Padding
                     }
                 };
                 outData.push_back(data);
             }
-        }
-
-        for (auto& child : instance->GetChildren()) {
-            CollectInstances(child, viewProj, frustum, outData);
         }
     }
 
@@ -150,7 +152,7 @@ namespace Nova {
                     }
                 }
             }
-            
+
             LightingData lData;
             if (lighting) {
                 lData.topAmbient = glm::vec4(lighting->props.TopAmbientV9.to_glm(), 1.0f);
@@ -163,16 +165,19 @@ namespace Nova {
             }
 
             std::vector<InstanceData> instances;
-            instances.reserve(2000); 
+            instances.reserve(workspace->cachedParts.size());
             CollectInstances(workspace, viewProj, frustum, instances);
 
-            std::sort(instances.begin(), instances.end(), [&](const InstanceData& a, const InstanceData& b) {
-                bool aTrans = a.color.a < 0.99f;
-                bool bTrans = b.color.a < 0.99f;
-                if (aTrans != bTrans) return !aTrans; 
+            // Optimization: Partition opaque and transparent
+            auto transparentIt = std::partition(instances.begin(), instances.end(), [](const InstanceData& d) {
+                return d.color.a >= 0.99f; // Opaque first
+            });
+
+            // Only sort the transparent range (back-to-front)
+            std::sort(transparentIt, instances.end(), [&](const InstanceData& a, const InstanceData& b) {
                 float distA = glm::distance2(glm::vec3(a.model[3]), cameraPos);
                 float distB = glm::distance2(glm::vec3(b.model[3]), cameraPos);
-                return aTrans ? (distA > distB) : (distA < distB);
+                return distA > distB;
             });
 
             auto copyCmd = SDL_BeginGPUCopyPass(cmd);
@@ -213,7 +218,7 @@ namespace Nova {
                 SDL_GPUBufferBinding vBinding = { .buffer = cubeBuffer, .offset = 0 };
                 SDL_BindGPUVertexBuffers(pass, 0, &vBinding, 1);
                 SDL_BindGPUVertexStorageBuffers(pass, 0, &instanceBuffer, 1);
-                
+
                 // Bind Surface Textures to Fragment Stage (Set 2, Slot 0)
                 SDL_GPUTextureSamplerBinding tBinding = { .texture = surfaceTexture, .sampler = surfaceSampler };
                 SDL_BindGPUFragmentSamplers(pass, 0, &tBinding, 1);

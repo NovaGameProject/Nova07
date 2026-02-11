@@ -15,6 +15,10 @@
     "luabridge3",
     "glm",
     "joltphysics",
-    "pugixml"
+    "pugixml",
+    {
+      "name": "tracy",
+      "features": ["on-demand"]
+    }
   ]
 }

@@ -14,8 +14,10 @@ find_package(glm CONFIG REQUIRED)
 find_package(unofficial-luau CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
 find_package(Jolt CONFIG REQUIRED)
+find_package(Tracy CONFIG REQUIRED)
 find_path(LUABRIDGE3_INCLUDE_DIRS "luabridge3/LuaBridge/Array.h")
 
+add_compile_definitions(TRACY_ENABLE)
 
 # Collect all Source Files automatically
 file(GLOB_RECURSE SOURCES
@@ -42,4 +44,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     Jolt::Jolt
     pugixml::static
+    Tracy::TracyClient
 )

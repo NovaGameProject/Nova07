@@ -8,10 +8,13 @@
 
 #pragma once
 #include "Common/MathTypes.hpp"
+#include "Engine/Enums/Enums.hpp"
 #include "Engine/Objects/Instance.hpp"
 #include "Common/BrickColors.hpp"
 #include <rfl/Flatten.hpp>
 #include <optional>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
 
 namespace Nova {
     namespace Props {
@@ -22,7 +25,7 @@ namespace Nova {
             Vector3Reflect size = {4.0f, 1.2f, 2.0f};
             bool Anchored = false;
             bool CanCollide = true;
-            std::optional<Color3Reflect> Color; 
+            std::optional<Color3Reflect> Color;
             float Transparency = 0.0f;
             int BrickColor = 194; // Medium Stone Grey
 
@@ -39,6 +42,21 @@ namespace Nova {
     public:
         // Direct pointer to props for high-performance access in the renderer
         Props::BasePartProps* basePartProps = nullptr;
+
+        // Jolt Physics linkage
+        JPH::BodyID physicsBodyID;
+
+        // Interpolation state
+        glm::vec3 prevPosition = glm::vec3(0);
+        glm::quat prevRotation = glm::quat(1, 0, 0, 0);
+        glm::vec3 currPosition = glm::vec3(0);
+        glm::quat currRotation = glm::quat(1, 0, 0, 0);
+
+        void InitializePhysics() {
+            auto cf = basePartProps->CFrame.get().to_nova();
+            currPosition = prevPosition = cf.position;
+            currRotation = prevRotation = glm::quat_cast(cf.rotation);
+        }
 
         BasePart(std::string name) : Instance(name) {}
 
@@ -59,7 +77,7 @@ namespace Nova {
 
         virtual glm::vec4 GetColor() {
             if (!basePartProps) return glm::vec4(1.0f);
-            
+
             glm::vec3 rgb;
             if (basePartProps->Color.has_value()) {
                 rgb = basePartProps->Color->to_glm();

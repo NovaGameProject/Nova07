@@ -126,7 +126,7 @@ namespace Nova {
         Instance(std::string name) : m_debugName(name) {}
 
         std::shared_ptr<Instance> GetParent() const { return parent.lock(); }
-        std::vector<std::shared_ptr<Instance>> GetChildren() const { return children; }
+        const std::vector<std::shared_ptr<Instance>>& GetChildren() const { return children; }
 
         void SetParent(std::shared_ptr<Instance> newParent) {
             auto self = shared_from_this();

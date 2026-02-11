@@ -27,3 +27,4 @@
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/Lighting.hpp"
+#include "Engine/Services/PhysicsService.hpp"

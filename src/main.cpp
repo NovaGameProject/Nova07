@@ -4,7 +4,9 @@
 #include "Engine/TaskScheduler.hpp"
 #include "Engine/Nova.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
+#include "Engine/Services/PhysicsService.hpp"
 #include <SDL3_image/SDL_image.h>
+#include <tracy/Tracy.hpp>
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -16,23 +18,24 @@ int main(int argc, char* argv[]) {
 
     auto game = std::make_shared<Nova::DataModel>();
     auto workspace = game->GetService<Nova::Workspace>();
+    auto physics = game->GetService<Nova::PhysicsService>();
 
     // Load the world from a file
-    Nova::LevelLoader::Load("./resources/Places/RobloxHQ.rbxl", game);
+    Nova::LevelLoader::Load("./resources/Places/HappyHomeInRobloxia.rbxl", game);
+
+    physics->Start();
 
     // Apply default lighting if not set by level
     {
         auto lighting = game->GetService<Nova::Lighting>();
-        // Check if ClearColor is black or default (usually black 0,0,0 or white 1,1,1)
-        // Standard classic Roblox sky was approx rgb(132, 177, 248)
         if (lighting->props.ClearColor.r == 0.0f || (lighting->props.ClearColor.r == 1.0f && lighting->props.ClearColor.g == 1.0f)) {
-            lighting->props.ClearColor = { 132/255.0f, 177/255.0f, 248/255.0f }; 
+            lighting->props.ClearColor = { 132/255.0f, 177/255.0f, 248/255.0f };
             lighting->props.TopAmbientV9 = { 0.5f, 0.5f, 0.5f };
             lighting->props.BottomAmbientV9 = { 0.2f, 0.2f, 0.2f };
         }
     }
 
-    // MOVE CAMERA OUT OF THE FLOOR (Baseplate is at 0, size 512,8,512 -> y range -4 to 4)
+    // MOVE CAMERA OUT OF THE FLOOR
     {
         auto workspace = game->GetService<Nova::Workspace>();
         auto findCamera = [](auto& self, std::shared_ptr<Nova::Instance> inst) -> std::shared_ptr<Nova::Camera> {
@@ -44,66 +47,53 @@ int main(int argc, char* argv[]) {
         };
         if (auto camera = findCamera(findCamera, workspace)) {
             auto cf = camera->props.CFrame.get().to_nova();
-            cf.position = glm::vec3(0, 20, 50); // Start back and up
+            cf.position = glm::vec3(0, 20, 50);
             camera->props.CFrame = Nova::CFrameReflect::from_nova(cf);
-            workspace->CurrentCamera = camera; // Link it
-            SDL_Log("Camera reset to starting position. PRESS ESC TO LOCK MOUSE AND MOVE.");
+            workspace->CurrentCamera = camera;
+            SDL_Log("Camera reset. ESC TO LOCK MOUSE.");
         }
     }
 
     Nova::LevelLoader::PrintInstanceTree(game);
 
-    // Use a unique_ptr so we can explicitly kill the renderer
-    // before the window goes out of scope.
     auto renderer = std::make_unique<Nova::Renderer>(window.GetWindow());
 
-    // Outside the scheduler, define some camera state
-    float camSpeed = 50.0f;
+    scheduler.AddJob({
+        .name = "PhysicsSync",
+        .callback = [&](double dt) {
+            physics->Step(dt);
+        },
+        .priority = 5,
+        .frequency = 0
+    });
 
     scheduler.AddJob({
         .name = "Input",
         .callback = [&](double dt) {
             std::shared_ptr<Nova::Camera> camera = workspace->CurrentCamera;
-
-            // Inside the Input Job callback
             if (camera) {
                 const bool* keys = SDL_GetKeyboardState(NULL);
-                float speed = 100.0f * (float)dt; // Increased speed for visibility
+                float speed = 100.0f * (float)dt;
                 float sensitivity = 0.002f;
-
-                // 1. Convert the current reflected data to our math-friendly CFrame
                 auto novaCF = camera->props.CFrame.get().to_nova();
-
                 float dx = window.mouseDeltaX;
                 float dy = window.mouseDeltaY;
-
-                // 2. YAW: Rotate around World Up (Global Y-axis)
-                // Applying this on the LEFT side rotates around the global axis.
                 glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), -dx * sensitivity, glm::vec3(0, 1, 0));
-
-                // 3. PITCH: Rotate around Local Right (Local X-axis)
-                // Applying this on the RIGHT side rotates around the object's own axis.
                 glm::mat4 pitch = glm::rotate(glm::mat4(1.0f), -dy * sensitivity, glm::vec3(1, 0, 0));
-
-                // 4. COMBINE: New Rotation = Yaw * CurrentRotation * Pitch
                 novaCF.rotation = glm::mat3(yaw * glm::mat4(novaCF.rotation) * pitch);
-
-                // 5. TRANSLATION (WASD + EQ)
-                glm::vec3 forward = -novaCF.rotation[2]; // Forward is -Z in Roblox/GLM
-                glm::vec3 right   = novaCF.rotation[0]; // Right is +X
-
+                glm::vec3 forward = -novaCF.rotation[2];
+                glm::vec3 right   = novaCF.rotation[0];
                 if (keys[SDL_SCANCODE_W]) novaCF.position += forward * speed;
                 if (keys[SDL_SCANCODE_S]) novaCF.position -= forward * speed;
                 if (keys[SDL_SCANCODE_A]) novaCF.position -= right * speed;
                 if (keys[SDL_SCANCODE_D]) novaCF.position += right * speed;
-                if (keys[SDL_SCANCODE_E]) novaCF.position.y += speed; // Fly UP
-                if (keys[SDL_SCANCODE_Q]) novaCF.position.y -= speed; // Fly DOWN
-
-                // 6. Push the modified data back into the reflected property
+                if (keys[SDL_SCANCODE_E]) novaCF.position.y += speed;
+                if (keys[SDL_SCANCODE_Q]) novaCF.position.y -= speed;
                 camera->props.CFrame = Nova::CFrameReflect::from_nova(novaCF);
+
             }
         },
-        .priority = 0,
+        .priority = 10,
         .frequency = 0
     });
 
@@ -111,37 +101,22 @@ int main(int argc, char* argv[]) {
         .name = "Render",
         .callback = [&](double dt) {
             (void)dt;
-            // Get the Workspace from your DataModel
-            auto workspace = game->GetService<Nova::Workspace>();
             renderer->RenderFrame(workspace);
+
         },
         .priority = 100,
         .frequency = 0
     });
 
     while (running) {
-        // 1. OS Events (High Priority, once per frame)
         running = window.PollEvents();
-
-        // 2. Marshalling (Run tasks sent from other threads)
         scheduler.ProcessMainThreadTasks();
-
-        // 3. Engine Step (Physics, Animation, Input Logic, Rendering)
         scheduler.Step();
 
-        // 4. Yield (Optional: prevents 100% CPU usage on some Linux distros)
-        // SDL_Delay(1);
+        FrameMark;
     }
 
-    // --- MANUALLY SHUT DOWN IN ORDER ---
-
-    // 1. Kill the renderer first.
-    // This calls ~Renderer, waits for GPU, unclaims window, and destroys device.
     renderer.reset();
-
-    // (This prevents lambdas from holding onto dead pointers)
-    scheduler.Clear(); 
-
+    scheduler.Clear();
     return 0;
-    // 3. window goes out of scope last, calling SDL_DestroyWindow and SDL_Quit.
 }
