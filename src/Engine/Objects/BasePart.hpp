@@ -53,12 +53,7 @@ namespace Nova {
 
         // Jolt Physics linkage
         JPH::BodyID physicsBodyID;
-
-        // Interpolation state
-        glm::vec3 prevPosition = glm::vec3(0);
-        glm::quat prevRotation = glm::quat(1, 0, 0, 0);
-        glm::vec3 currPosition = glm::vec3(0);
-        glm::quat currRotation = glm::quat(1, 0, 0, 0);
+        std::weak_ptr<PhysicsService> registeredService;
 
         void InitializePhysics();
 

@@ -10,6 +10,7 @@
 #include "Engine/Reflection/LevelLoader.hpp"
 #include "Common/MathTypes.hpp"
 #include "Engine/Services/PhysicsService.hpp"
+#include "Engine/Objects/Model.hpp"
 #include <SDL3/SDL_log.h>
 #include <map>
 #include <string>
@@ -180,6 +181,8 @@ namespace Nova {
             if (name == "canCollide") name = "CanCollide";
             if (name == "CoordinateFrame") name = "CFrame";
             if (name == "size") name = "Size";
+            if (name == "archivable") name = "Archivable";
+            if (name == "name") name = "Name";
 
             if (type == "string") propMap[name] = rfl::Generic(std::string(prop.text().get()));
             else if (type == "bool")   propMap[name] = rfl::Generic(prop.text().as_bool());
@@ -273,8 +276,8 @@ namespace Nova {
 
                 // Handle specific non-reflected references
                 if (propName == "PrimaryPart") {
-                    if (auto ws = std::dynamic_pointer_cast<Workspace>(inst)) {
-                        ws->PrimaryPart = target;
+                    if (auto mod = std::dynamic_pointer_cast<Model>(inst)) {
+                        mod->PrimaryPart = target;
                     }
                 }
                 else if (propName == "CurrentCamera") {

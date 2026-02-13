@@ -124,6 +124,7 @@ namespace Nova {
         luabridge::getGlobalNamespace(L).deriveClass<Lighting, Instance>("Lighting").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<BasePart, Instance>("BasePart").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Part, BasePart>("Part").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Model, Instance>("Model").endClass();
     }
 
     void ScriptContext::SetDataModel(std::shared_ptr<DataModel> dataModel) {

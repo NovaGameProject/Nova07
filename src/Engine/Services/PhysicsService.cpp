@@ -8,6 +8,8 @@
 
 #include "PhysicsService.hpp"
 #include "Engine/Objects/BasePart.hpp"
+#include "Engine/Services/Workspace.hpp"
+#include "Engine/Services/DataModel.hpp"
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
@@ -95,6 +97,37 @@ namespace Nova {
         }
     };
 
+    class PhysicsService::ContactListenerImpl : public JPH::ContactListener {
+    public:
+        PhysicsService* service;
+        ContactListenerImpl(PhysicsService* service) : service(service) {}
+
+        JPH::ValidateResult OnContactValidate(const JPH::Body &inBody1, const JPH::Body &inBody2, JPH::RVec3Arg inBaseOffset, const JPH::CollideShapeResult &inCollisionResult) override {
+            return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
+        }
+
+        void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override {
+            // CRITICAL: OnContactAdded is called from Jolt worker threads during Update.
+            // bodyToPartMap is STABLE during Update because no mutations occur.
+            
+            auto id1 = inBody1.GetID();
+            auto id2 = inBody2.GetID();
+
+            auto it1 = service->bodyToPartMap.find(id1);
+            auto it2 = service->bodyToPartMap.find(id2);
+
+            if (it1 != service->bodyToPartMap.end() && it2 != service->bodyToPartMap.end()) {
+                auto p1 = it1->second.lock();
+                auto p2 = it2->second.lock();
+
+                if (p1 && p2) {
+                    std::lock_guard<std::mutex> lock(service->mContactMutex);
+                    service->mContactBuffer.push_back({ p1, p2 });
+                }
+            }
+        }
+    };
+
     // --- PhysicsService Implementation ---
 
     PhysicsService::PhysicsService() : Instance("PhysicsService") {
@@ -108,23 +141,26 @@ namespace Nova {
             JPH::RegisterTypes();
         }
 
-        tempAllocator = new JPH::TempAllocatorImpl(64 * 1024 * 1024);
+        tempAllocator = new JPH::TempAllocatorImpl(256 * 1024 * 1024); // Increased to 256MB
         jobSystem = new JPH::JobSystemThreadPool(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, std::max(1, (int)std::thread::hardware_concurrency() - 1));
 
         bp_interface = std::make_unique<BPLInterfaceImpl>();
         obp_filter = std::make_unique<ObjectVsBroadPhaseLayerFilterImpl>();
         olp_filter = std::make_unique<ObjectLayerPairFilterImpl>();
+        contact_listener = std::make_unique<ContactListenerImpl>(this);
 
         physicsSystem = new JPH::PhysicsSystem();
         physicsSystem->Init(
-            65536,  // Max Bodies
-            2096,     // Mutexes
-            65536,  // Max Body Pairs
-            65536,  // Max Contact Manifolds
+            262144, // Max Bodies (Increased to 256k)
+            2096,   // Mutexes
+            262144, // Max Body Pairs
+            262144, // Max Contact Manifolds
             *bp_interface,
             *obp_filter,
             *olp_filter
         );
+
+        physicsSystem->SetContactListener(contact_listener.get());
 
         physicsSystem->SetGravity(JPH::Vec3(0, -196.2f, 0));
         JPH::PhysicsSettings settings;
@@ -150,6 +186,7 @@ namespace Nova {
         mStopping = false;
         mThread = std::thread([this]() {
             auto lastTime = std::chrono::steady_clock::now();
+
             while (!mStopping) {
                 auto now = std::chrono::steady_clock::now();
                 float dt = std::chrono::duration<float>(now - lastTime).count();
@@ -157,6 +194,10 @@ namespace Nova {
 
                 if (dt > 0) {
                     std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
+                    
+                    // Process mutations (Add/Remove) BEFORE update
+                    ProcessQueuedMutations();
+
                     float internalDt = std::min(dt, 1.0f / 30.0f);
                     physicsSystem->Update(internalDt, 6, tempAllocator, jobSystem);
                     SyncTransforms();
@@ -175,11 +216,11 @@ namespace Nova {
     }
 
     void PhysicsService::SetDeferRegistration(bool defer) {
-        std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
+        std::lock_guard<std::mutex> lock(mQueueMutex);
         if (mDeferring && !defer) {
             // Re-enabling: Process all deferred parts in one bulk call
             if (!mDeferredParts.empty()) {
-                BulkRegisterParts(mDeferredParts);
+                mPendingRegisters.insert(mPendingRegisters.end(), mDeferredParts.begin(), mDeferredParts.end());
                 mDeferredParts.clear();
             }
         }
@@ -187,33 +228,63 @@ namespace Nova {
     }
 
     void PhysicsService::BulkRegisterParts(const std::vector<std::shared_ptr<BasePart>>& parts) {
-        std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
-
-        // If we are deferring and this is NOT the deferred flush call, just queue them
-        if (mDeferring && &parts != &mDeferredParts) {
+        std::lock_guard<std::mutex> lock(mQueueMutex);
+        if (mDeferring) {
             mDeferredParts.insert(mDeferredParts.end(), parts.begin(), parts.end());
-            return;
+        } else {
+            mPendingRegisters.insert(mPendingRegisters.end(), parts.begin(), parts.end());
+        }
+    }
+
+    void PhysicsService::BulkUnregisterParts(const std::vector<std::shared_ptr<BasePart>>& parts) {
+        std::lock_guard<std::mutex> lock(mQueueMutex);
+        for (auto& part : parts) {
+            if (!part->physicsBodyID.IsInvalid()) {
+                mPendingRemovals.push_back(part->physicsBodyID);
+                part->physicsBodyID = JPH::BodyID(); // Invalidate immediately on main thread
+            }
+        }
+    }
+
+    void PhysicsService::UnregisterPart(std::shared_ptr<BasePart> part) {
+        std::lock_guard<std::mutex> lock(mQueueMutex);
+        if (!part->physicsBodyID.IsInvalid()) {
+            mPendingRemovals.push_back(part->physicsBodyID);
+            part->physicsBodyID = JPH::BodyID();
+        }
+    }
+
+    void PhysicsService::ProcessQueuedMutations() {
+        // ASSUMPTION: mPhysicsMutex is already held by the caller (Physics Thread)
+        std::vector<std::shared_ptr<BasePart>> toAdd;
+        std::vector<JPH::BodyID> toRemove;
+
+        {
+            std::lock_guard<std::mutex> lock(mQueueMutex);
+            toAdd.swap(mPendingRegisters);
+            toRemove.swap(mPendingRemovals);
         }
 
         JPH::BodyInterface &bi = physicsSystem->GetBodyInterface();
+
+        // 1. Process Removals
+        if (!toRemove.empty()) {
+            bi.RemoveBodies(toRemove.data(), (int)toRemove.size());
+            bi.DestroyBodies(toRemove.data(), (int)toRemove.size());
+            for (auto id : toRemove) bodyToPartMap.erase(id);
+        }
+
+        // 2. Process Additions
         JPH::BodyIDVector bodiesToAdd;
-
-        for (auto& part : parts) {
+        for (auto& part : toAdd) {
             if (!part || !part->basePartProps) continue;
-            if (!part->physicsBodyID.IsInvalid()) continue; // Already registered
-
+            
             auto& props = *part->basePartProps;
             auto cf = props.CFrame.get().to_nova();
             auto size = props.Size.get().to_glm();
 
-            float minDim = 0.05f;
-            float hx = std::max(minDim, size.x * 0.5f);
-            float hy = std::max(minDim, size.y * 0.5f);
-            float hz = std::max(minDim, size.z * 0.5f);
-
-            JPH::BoxShapeSettings shapeSettings(JPH::Vec3(hx, hy, hz));
+            JPH::BoxShapeSettings shapeSettings(JPH::Vec3(std::max(0.05f, size.x * 0.5f), std::max(0.05f, size.y * 0.5f), std::max(0.05f, size.z * 0.5f)));
             JPH::Shape::ShapeResult shapeResult = shapeSettings.Create();
-
             if (!shapeResult.IsValid()) continue;
 
             bool anchored = props.Anchored;
@@ -221,7 +292,6 @@ namespace Nova {
             JPH::ObjectLayer layer = anchored ? Layers::NON_MOVING : Layers::MOVING;
 
             glm::quat q = glm::normalize(glm::quat_cast(cf.rotation));
-
             JPH::BodyCreationSettings bodySettings(
                 shapeResult.Get(),
                 JPH::RVec3(cf.position.x, cf.position.y, cf.position.z),
@@ -230,20 +300,16 @@ namespace Nova {
                 layer
             );
 
-            // OPTIMIZATION: UserData holds raw pointer for O(1) sync
             bodySettings.mUserData = (uint64_t)part.get();
-
-            if (motionType == JPH::EMotionType::Dynamic) {
-                float volume = size.x * size.y * size.z;
-                if (volume < 5.0f) {
-                    bodySettings.mMotionQuality = JPH::EMotionQuality::LinearCast;
-                }
+            if (motionType == JPH::EMotionType::Dynamic && (size.x * size.y * size.z) < 5.0f) {
+                bodySettings.mMotionQuality = JPH::EMotionQuality::LinearCast;
             }
 
             JPH::Body* body = bi.CreateBody(bodySettings);
             if (body) {
                 bodiesToAdd.push_back(body->GetID());
                 part->physicsBodyID = body->GetID();
+                part->registeredService = std::static_pointer_cast<PhysicsService>(shared_from_this());
                 bodyToPartMap[body->GetID()] = part;
             }
         }
@@ -255,15 +321,6 @@ namespace Nova {
         }
     }
 
-    void PhysicsService::UnregisterPart(std::shared_ptr<BasePart> part) {
-        std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
-        if (part->physicsBodyID.IsInvalid()) return;
-        physicsSystem->GetBodyInterface().RemoveBody(part->physicsBodyID);
-        physicsSystem->GetBodyInterface().DestroyBody(part->physicsBodyID);
-        bodyToPartMap.erase(part->physicsBodyID);
-        part->physicsBodyID = JPH::BodyID();
-    }
-
     void PhysicsService::Step(float dt) {
         std::vector<TransformUpdate> updates;
         {
@@ -271,8 +328,25 @@ namespace Nova {
             updates.swap(mTransformBuffer);
         }
 
+        float destroyHeight = -500.0f;
+        auto dm = GetDataModel();
+        std::shared_ptr<Workspace> ws = nullptr;
+        if (dm) {
+            ws = dm->GetService<Workspace>();
+            if (ws) destroyHeight = ws->props.FallenPartsDestroyHeight;
+        }
+
+        std::vector<std::shared_ptr<BasePart>> toRemove;
+
         for (const auto& update : updates) {
             if (auto part = update.part.lock()) {
+                // FallenPartsDestroyHeight Check
+                if (update.position.y < destroyHeight) {
+                    toRemove.push_back(part);
+                    continue;
+                }
+
+                // Sync to C++ property so GetLocalTransform() returns the exact physical state
                 if (part->basePartProps) {
                     auto& cf = part->basePartProps->CFrame;
                     auto nova_cf = cf.get().to_nova();
@@ -282,9 +356,39 @@ namespace Nova {
                 }
             }
         }
+
+        // NON-BLOCKING Bulk removal
+        if (!toRemove.empty()) {
+            BulkUnregisterParts(toRemove);
+            for (auto& part : toRemove) {
+                if (auto p = part->parent.lock()) {
+                    auto& c = p->children;
+                    c.erase(std::remove(c.begin(), c.end(), part), c.end());
+                }
+                part->parent.reset();
+            }
+            if (ws) ws->RefreshCachedParts(); // Refresh once at the end
+        }
+
+        // Fire Touched signals
+        std::vector<ContactEvent> contacts;
+        {
+            std::lock_guard<std::mutex> lock(mContactMutex);
+            contacts.swap(mContactBuffer);
+        }
+
+        for (const auto& contact : contacts) {
+            auto p1 = contact.part1.lock();
+            auto p2 = contact.part2.lock();
+            if (p1 && p2) {
+                p1->Touched.fire(p2);
+                p2->Touched.fire(p1);
+            }
+        }
     }
 
     void PhysicsService::SyncTransforms() {
+        // ASSUMPTION: mPhysicsMutex is already held by the caller (Physics Thread)
         JPH::BodyInterface &bi = physicsSystem->GetBodyInterface();
         JPH::BodyIDVector activeBodies;
 
@@ -294,23 +398,23 @@ namespace Nova {
         updates.reserve(activeBodies.size());
 
         for (const auto& id : activeBodies) {
-            // Static bodies shouldn't be in activeBodies anyway, but we check for safety
             if (bi.GetMotionType(id) == JPH::EMotionType::Static) continue;
 
-            uint64_t userData = bi.GetUserData(id);
-            if (userData == 0) continue;
+            // Safe lookup in the map (managed only on Physics Thread)
+            auto it = bodyToPartMap.find(id);
+            if (it == bodyToPartMap.end()) continue;
 
-            BasePart* partPtr = reinterpret_cast<BasePart*>(userData);
+            if (auto part = it->second.lock()) {
+                JPH::RVec3 pos;
+                JPH::Quat rot;
+                bi.GetPositionAndRotation(id, pos, rot);
 
-            JPH::RVec3 pos;
-            JPH::Quat rot;
-            bi.GetPositionAndRotation(id, pos, rot);
-
-            TransformUpdate update;
-            update.part = std::static_pointer_cast<BasePart>(partPtr->shared_from_this());
-            update.position = glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ());
-            update.rotation = glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ());
-            updates.push_back(std::move(update));
+                TransformUpdate update;
+                update.part = part;
+                update.position = glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ());
+                update.rotation = glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ());
+                updates.push_back(std::move(update));
+            }
         }
 
         {

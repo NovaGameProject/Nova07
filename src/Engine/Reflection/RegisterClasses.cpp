@@ -12,6 +12,7 @@
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/ScriptContext.hpp"
+#include "Engine/Objects/Model.hpp"
 
 namespace Nova {
     void RegisterClasses() {
@@ -24,6 +25,7 @@ namespace Nova {
         ClassDescriptorBuilder<Workspace>("Workspace", "Instance");
         ClassDescriptorBuilder<DataModel>("DataModel", "Instance");
         ClassDescriptorBuilder<ScriptContext>("ScriptContext", "Instance");
+        ClassDescriptorBuilder<Model>("Model", "Instance");
 
         // ... more classes ...
     }

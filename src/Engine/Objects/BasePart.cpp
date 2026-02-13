@@ -16,7 +16,9 @@
 namespace Nova {
     BasePart::~BasePart() {
         if (!physicsBodyID.IsInvalid()) {
-            if (auto dm = GetDataModel()) {
+            if (auto physics = registeredService.lock()) {
+                physics->UnregisterPart(std::static_pointer_cast<BasePart>(shared_from_this()));
+            } else if (auto dm = GetDataModel()) {
                 if (auto physics = dm->GetService<PhysicsService>()) {
                     physics->UnregisterPart(std::static_pointer_cast<BasePart>(shared_from_this()));
                 }
@@ -27,8 +29,7 @@ namespace Nova {
     void BasePart::InitializePhysics() {
         if (!basePartProps) return;
         auto cf = basePartProps->CFrame.get().to_nova();
-        currPosition = prevPosition = cf.position;
-        currRotation = prevRotation = glm::normalize(glm::quat_cast(cf.rotation));
+        // Since we removed interpolation state from header, we don't need to sync prev/curr anymore
     }
 
     void BasePart::OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) {
@@ -41,12 +42,21 @@ namespace Nova {
                 auto physics = dm->GetService<PhysicsService>();
                 if (physicsBodyID.IsInvalid()) {
                     physics->BulkRegisterParts({ std::static_pointer_cast<BasePart>(shared_from_this()) });
-                    // BulkRegisterParts initializes physics for the part if it's not deferring
                     if (!physics->IsDeferring()) InitializePhysics();
                 }
             } else {
                 if (!physicsBodyID.IsInvalid()) {
-                    auto physics = dm->GetService<PhysicsService>();
+                    if (auto physics = registeredService.lock()) {
+                        physics->UnregisterPart(std::static_pointer_cast<BasePart>(shared_from_this()));
+                    } else if (auto p = dm->GetService<PhysicsService>()) {
+                        p->UnregisterPart(std::static_pointer_cast<BasePart>(shared_from_this()));
+                    }
+                }
+            }
+        } else {
+            // Detached from tree
+            if (!physicsBodyID.IsInvalid()) {
+                if (auto physics = registeredService.lock()) {
                     physics->UnregisterPart(std::static_pointer_cast<BasePart>(shared_from_this()));
                 }
             }
@@ -56,9 +66,12 @@ namespace Nova {
     void BasePart::OnPropertyChanged(const std::string& name) {
         if (physicsBodyID.IsInvalid()) return;
 
-        auto dm = GetDataModel();
-        if (!dm) return;
-        auto physics = dm->GetService<PhysicsService>();
+        auto physics = registeredService.lock();
+        if (!physics) {
+            auto dm = GetDataModel();
+            if (dm) physics = dm->GetService<PhysicsService>();
+        }
+        
         if (!physics) return;
 
         JPH::BodyInterface &bi = physics->GetPhysicsSystem()->GetBodyInterface();
@@ -70,16 +83,8 @@ namespace Nova {
                 JPH::RVec3(cf.position.x, cf.position.y, cf.position.z),
                 JPH::Quat(q.x, q.y, q.z, q.w),
                 JPH::EActivation::Activate);
-            
-            // Sync interpolation state
-            currPosition = prevPosition = cf.position;
-            currRotation = prevRotation = q;
         }
         else if (name == "Anchored") {
-            bool anchored = basePartProps->Anchored;
-            bi.SetMotionType(physicsBodyID, anchored ? JPH::EMotionType::Static : JPH::EMotionType::Dynamic, JPH::EActivation::Activate);
-            
-            // For layer changes (static vs moving), we must re-register
             physics->UnregisterPart(std::static_pointer_cast<BasePart>(shared_from_this()));
             physics->BulkRegisterParts({ std::static_pointer_cast<BasePart>(shared_from_this()) });
         }

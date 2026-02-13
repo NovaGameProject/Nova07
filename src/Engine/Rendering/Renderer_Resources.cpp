@@ -8,6 +8,8 @@
 
 #include "Renderer.hpp"
 #include "Geometry.hpp"
+#include "Engine/Services/Lighting.hpp"
+#include "Engine/Objects/Sky.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <SDL3_image/SDL_image.h>
 #include <cstring>

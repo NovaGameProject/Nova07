@@ -35,8 +35,8 @@ namespace Nova {
 
     namespace Props {
         struct InstanceProps {
-            rfl::Rename<"Name", std::string> Name;
-            rfl::Rename<"archivable", bool> Archivable = true;
+            std::string Name;
+            bool Archivable = true;
         };
     }
 
@@ -72,12 +72,26 @@ namespace Nova {
         } \
         \
         void ApplyPropertiesGeneric(const rfl::Generic& generic) override { \
-            auto result = rfl::from_generic<decltype(this->PropsMember), rfl::UnderlyingEnums>(generic); \
-            if (result) { \
-                this->PropsMember = result.value(); \
-            } else { \
-                std::cout << "[REFLECTION ERROR] " << #ClassName << " failed: " \
-                          << result.error().what() << std::endl; \
+            auto current = rfl::to_generic<rfl::UnderlyingEnums>(this->PropsMember); \
+            if (auto* dest = std::get_if<rfl::Object<rfl::Generic>>(&current.variant())) { \
+                if (auto* src = std::get_if<rfl::Object<rfl::Generic>>(&generic.variant())) { \
+                    for (const auto& entry : *src) { \
+                        const auto& name = entry.first; \
+                        const auto& value = entry.second; \
+                        /* Update in-place to avoid duplicates */ \
+                        auto it = std::find_if(dest->begin(), dest->end(), [&](const auto& p) { return p.first == name; }); \
+                        if (it != dest->end()) { \
+                            it->second = value; \
+                        } \
+                    } \
+                    auto result = rfl::from_generic<decltype(this->PropsMember), rfl::UnderlyingEnums>(current); \
+                    if (result) { \
+                        this->PropsMember = result.value(); \
+                    } else { \
+                        std::cout << "[REFLECTION ERROR] " << #ClassName << " failed: " \
+                                  << result.error().what() << std::endl; \
+                    } \
+                } \
             } \
         } \
         \
@@ -92,12 +106,15 @@ namespace Nova {
         bool SetProperty(const std::string& name, const rfl::Generic& value) override { \
             auto generic = rfl::to_generic<rfl::UnderlyingEnums>(this->PropsMember); \
             if (auto* obj = std::get_if<rfl::Object<rfl::Generic>>(&generic.variant())) { \
-                (*obj)[name] = value; \
-                auto result = rfl::from_generic<decltype(this->PropsMember), rfl::UnderlyingEnums>(generic); \
-                if (result) { \
-                    this->PropsMember = result.value(); \
-                    OnPropertyChanged(name); \
-                    return true; \
+                auto it = std::find_if(obj->begin(), obj->end(), [&](const auto& p) { return p.first == name; }); \
+                if (it != obj->end()) { \
+                    it->second = value; \
+                    auto result = rfl::from_generic<decltype(this->PropsMember), rfl::UnderlyingEnums>(generic); \
+                    if (result) { \
+                        this->PropsMember = result.value(); \
+                        OnPropertyChanged(name); \
+                        return true; \
+                    } \
                 } \
             } \
             return false; \
@@ -106,7 +123,7 @@ namespace Nova {
         std::string GetName() const override { \
             /* Now we get the whole struct and just pick the Name out of it */ \
             auto& instance = ::Nova::Internal::get_instance_props(this->PropsMember); \
-            return std::string(instance.Name.value()); \
+            return std::string(instance.Name); \
         }
 
     // For classes WITHOUT props (like Folder/DataModel)
@@ -143,19 +160,7 @@ namespace Nova {
         std::shared_ptr<Instance> GetParent() const { return parent.lock(); }
         const std::vector<std::shared_ptr<Instance>>& GetChildren() const { return children; }
 
-        void SetParent(std::shared_ptr<Instance> newParent) {
-            auto self = shared_from_this();
-            if (auto p = parent.lock()) {
-                auto& c = p->children;
-                c.erase(std::remove(c.begin(), c.end(), self), c.end());
-            }
-            parent = newParent;
-            if (newParent) {
-                newParent->children.push_back(self);
-            }
-            
-            OnAncestorChanged(self, newParent);
-        }
+        void SetParent(std::shared_ptr<Instance> newParent);
 
         std::shared_ptr<DataModel> GetDataModel();
         bool IsDescendantOf(std::shared_ptr<Instance> other);

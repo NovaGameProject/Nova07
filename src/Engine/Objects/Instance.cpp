@@ -35,6 +35,41 @@ namespace Nova {
         return false;
     }
 
+    void Instance::SetParent(std::shared_ptr<Instance> newParent) {
+        auto self = shared_from_this();
+        
+        // Find old workspace for refresh
+        std::shared_ptr<Workspace> oldWS = nullptr;
+        if (auto dm = GetDataModel()) oldWS = dm->GetService<Workspace>();
+        bool wasInWS = oldWS && (this == oldWS.get() || IsDescendantOf(oldWS));
+
+        if (auto p = parent.lock()) {
+            auto& c = p->children;
+            c.erase(std::remove(c.begin(), c.end(), self), c.end());
+        }
+        
+        parent = newParent;
+        if (newParent) {
+            newParent->children.push_back(self);
+        }
+        
+        OnAncestorChanged(self, newParent);
+
+        // Refresh old workspace cache
+        if (wasInWS && oldWS) oldWS->RefreshCachedParts();
+
+        // Refresh new workspace cache
+        if (newParent) {
+            if (auto dm = newParent->GetDataModel()) {
+                if (auto newWS = dm->GetService<Workspace>()) {
+                    if (this == newWS.get() || IsDescendantOf(newWS)) {
+                        newWS->RefreshCachedParts();
+                    }
+                }
+            }
+        }
+    }
+
     void Instance::OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) {
         for (auto& child : children) {
             child->OnAncestorChanged(instance, newParent);
@@ -104,13 +139,6 @@ namespace Nova {
                     auto res = value.cast<std::shared_ptr<Instance>>();
                     if (res) {
                         self.SetParent(res.value());
-                        
-                        // Handle cache refresh for rendering
-                        if (auto dm = self.GetDataModel()) {
-                            if (auto ws = dm->GetService<Workspace>()) {
-                                if (self.IsDescendantOf(ws)) ws->RefreshCachedParts();
-                            }
-                        }
                     }
                 }
                 lua_pop(L, 1);

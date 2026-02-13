@@ -14,6 +14,7 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/ContactListener.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
@@ -40,6 +41,11 @@ namespace Nova {
         glm::quat rotation;
     };
 
+    struct ContactEvent {
+        std::weak_ptr<BasePart> part1;
+        std::weak_ptr<BasePart> part2;
+    };
+
     class PhysicsService : public Instance {
     public:
         PhysicsService();
@@ -54,8 +60,9 @@ namespace Nova {
         // Called by Main Thread to apply queued updates
         void Step(float dt);
 
-        // Physics Management
+        // Physics Management (Now non-blocking)
         void BulkRegisterParts(const std::vector<std::shared_ptr<BasePart>>& parts);
+        void BulkUnregisterParts(const std::vector<std::shared_ptr<BasePart>>& parts);
         void UnregisterPart(std::shared_ptr<BasePart> part);
 
         JPH::PhysicsSystem* GetPhysicsSystem() { return physicsSystem; }
@@ -66,6 +73,7 @@ namespace Nova {
 
     private:
         void SyncTransforms();
+        void ProcessQueuedMutations(); // Run on Physics Thread
 
 
         // Jolt Boilerplate
@@ -84,21 +92,32 @@ namespace Nova {
         // Threading
         std::thread mThread;
         std::atomic<bool> mStopping = false;
-        std::recursive_mutex mPhysicsMutex; // Changed to recursive_mutex to prevent deadlocks on nested calls
+        std::recursive_mutex mPhysicsMutex; // Protects the JPH::PhysicsSystem itself
+        
         std::mutex mBufferMutex;  // Mutex for transform buffer
         std::vector<TransformUpdate> mTransformBuffer;
+        
+        std::mutex mContactMutex;
+        std::vector<ContactEvent> mContactBuffer;
 
-        // Deferred registration state
+        // Command Queue for Thread-Safe mutations (Registration/Removal)
+        std::mutex mQueueMutex;
+        std::vector<std::shared_ptr<BasePart>> mPendingRegisters;
+        std::vector<JPH::BodyID> mPendingRemovals;
+
+        // Deferred registration state (during Level Load)
         bool mDeferring = false;
         std::vector<std::shared_ptr<BasePart>> mDeferredParts;
 
-        // Implementation of BroadPhaseLayerInterface, ObjectVsBroadPhaseLayerFilter, etc.
+        // Jolt implementation classes
         class BPLInterfaceImpl;
         class ObjectVsBroadPhaseLayerFilterImpl;
         class ObjectLayerPairFilterImpl;
+        class ContactListenerImpl;
 
         std::unique_ptr<BPLInterfaceImpl> bp_interface;
         std::unique_ptr<ObjectVsBroadPhaseLayerFilterImpl> obp_filter;
         std::unique_ptr<ObjectLayerPairFilterImpl> olp_filter;
+        std::unique_ptr<ContactListenerImpl> contact_listener;
     };
 }

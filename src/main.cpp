@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    engine.LoadLevel("./resources/Places/RobloxHQ.rbxl");
+    engine.LoadLevel("./resources/Places/HappyHomeInRobloxiaBaseNoCollision.rbxl");
 
     auto scriptContext = engine.GetDataModel()->GetService<Nova::ScriptContext>();
 
