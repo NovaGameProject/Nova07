@@ -15,12 +15,12 @@ namespace Nova {
     namespace Props {
         struct LightingProps {
             rfl::Flatten<InstanceProps> base;
-            Color3Reflect TopAmbientV9;
-            Color3Reflect BottomAmbientV9;
-            Color3Reflect SpotLightV9;
-            Color3Reflect ClearColor;
-            float GeographicLatitude;
-            std::string TimeOfDay;
+            Color3Reflect TopAmbientV9 = {0.5f, 0.5f, 0.5f};
+            Color3Reflect BottomAmbientV9 = {0.2f, 0.2f, 0.2f};
+            Color3Reflect SpotLightV9 = {1.0f, 1.0f, 1.0f};
+            Color3Reflect ClearColor = {0.517647f, 0.694118f, 0.972549f};
+            float GeographicLatitude = 41.7333f;
+            std::string TimeOfDay = "14:00:00";
         };
     }
 

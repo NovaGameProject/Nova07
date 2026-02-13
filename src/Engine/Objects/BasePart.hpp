@@ -11,20 +11,25 @@
 #include "Engine/Enums/Enums.hpp"
 #include "Engine/Objects/Instance.hpp"
 #include "Common/BrickColors.hpp"
+#include "Engine/Common/Signal.hpp"
 #include <rfl/Flatten.hpp>
 #include <optional>
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
 
 namespace Nova {
+    class PhysicsService;
+
     namespace Props {
         struct BasePartProps {
             rfl::Flatten<Props::InstanceProps> base;
+            
             rfl::Rename<"CFrame", CFrameReflect> CFrame;
-
-            Vector3Reflect size = {4.0f, 1.2f, 2.0f};
+            rfl::Rename<"Size", Vector3Reflect> Size = Vector3Reflect{4.0f, 1.2f, 2.0f};
+            
             bool Anchored = false;
             bool CanCollide = true;
+            
             std::optional<Color3Reflect> Color;
             float Transparency = 0.0f;
             int BrickColor = 194; // Medium Stone Grey
@@ -40,6 +45,9 @@ namespace Nova {
 
     class BasePart : public Instance {
     public:
+        Signal Touched;
+        virtual ~BasePart();
+
         // Direct pointer to props for high-performance access in the renderer
         Props::BasePartProps* basePartProps = nullptr;
 
@@ -52,11 +60,7 @@ namespace Nova {
         glm::vec3 currPosition = glm::vec3(0);
         glm::quat currRotation = glm::quat(1, 0, 0, 0);
 
-        void InitializePhysics() {
-            auto cf = basePartProps->CFrame.get().to_nova();
-            currPosition = prevPosition = cf.position;
-            currRotation = prevRotation = glm::quat_cast(cf.rotation);
-        }
+        void InitializePhysics();
 
         BasePart(std::string name) : Instance(name) {}
 
@@ -71,7 +75,7 @@ namespace Nova {
         }
 
         virtual glm::vec3 GetSize() {
-            if (basePartProps) return basePartProps->size.to_glm();
+            if (basePartProps) return basePartProps->Size.get().to_glm();
             return glm::vec3(1.0f);
         }
 
@@ -86,5 +90,8 @@ namespace Nova {
             }
             return glm::vec4(rgb, 1.0f - basePartProps->Transparency);
         }
+
+        void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
+        void OnPropertyChanged(const std::string& name) override;
     };
 }

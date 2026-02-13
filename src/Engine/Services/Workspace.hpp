@@ -47,7 +47,14 @@ namespace Nova {
         Props::WorkspaceProps props;
         NOVA_OBJECT(Workspace, props)
 
-        Workspace() : Instance("Workspace") {}
+        Workspace() : Instance("Workspace") {
+            props.base.get().Name = "Workspace";
+        }
+
+        void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override {
+            Instance::OnAncestorChanged(instance, newParent);
+            RefreshCachedParts();
+        }
     };
 
 }

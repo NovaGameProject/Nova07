@@ -17,7 +17,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
-#include <map>
+#include <unordered_map>
 #include <thread>
 #include <mutex>
 #include <vector>
@@ -58,6 +58,12 @@ namespace Nova {
         void BulkRegisterParts(const std::vector<std::shared_ptr<BasePart>>& parts);
         void UnregisterPart(std::shared_ptr<BasePart> part);
 
+        JPH::PhysicsSystem* GetPhysicsSystem() { return physicsSystem; }
+
+        // Performance Optimization: Defer registration during level load
+        void SetDeferRegistration(bool defer);
+        bool IsDeferring() const { return mDeferring; }
+
     private:
         void SyncTransforms();
 
@@ -67,15 +73,24 @@ namespace Nova {
         JPH::TempAllocatorImpl* tempAllocator;
         JPH::JobSystemThreadPool* jobSystem;
 
-        // Mapping for state sync
-        std::map<JPH::BodyID, std::weak_ptr<BasePart>> bodyToPartMap;
+        // Mapping for state sync (using unordered_map for O(1) average lookup)
+        struct BodyIDHasher {
+            size_t operator()(const JPH::BodyID& id) const {
+                return std::hash<uint32_t>{}(id.GetIndex());
+            }
+        };
+        std::unordered_map<JPH::BodyID, std::weak_ptr<BasePart>, BodyIDHasher> bodyToPartMap;
 
         // Threading
         std::thread mThread;
         std::atomic<bool> mStopping = false;
-        std::mutex mPhysicsMutex; // Mutex for Jolt system access
+        std::recursive_mutex mPhysicsMutex; // Changed to recursive_mutex to prevent deadlocks on nested calls
         std::mutex mBufferMutex;  // Mutex for transform buffer
         std::vector<TransformUpdate> mTransformBuffer;
+
+        // Deferred registration state
+        bool mDeferring = false;
+        std::vector<std::shared_ptr<BasePart>> mDeferredParts;
 
         // Implementation of BroadPhaseLayerInterface, ObjectVsBroadPhaseLayerFilter, etc.
         class BPLInterfaceImpl;

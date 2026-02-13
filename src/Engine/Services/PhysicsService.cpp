@@ -156,7 +156,7 @@ namespace Nova {
                 lastTime = now;
 
                 if (dt > 0) {
-                    std::lock_guard<std::mutex> lock(mPhysicsMutex);
+                    std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
                     float internalDt = std::min(dt, 1.0f / 30.0f);
                     physicsSystem->Update(internalDt, 6, tempAllocator, jobSystem);
                     SyncTransforms();
@@ -174,17 +174,37 @@ namespace Nova {
         }
     }
 
+    void PhysicsService::SetDeferRegistration(bool defer) {
+        std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
+        if (mDeferring && !defer) {
+            // Re-enabling: Process all deferred parts in one bulk call
+            if (!mDeferredParts.empty()) {
+                BulkRegisterParts(mDeferredParts);
+                mDeferredParts.clear();
+            }
+        }
+        mDeferring = defer;
+    }
+
     void PhysicsService::BulkRegisterParts(const std::vector<std::shared_ptr<BasePart>>& parts) {
-        std::lock_guard<std::mutex> lock(mPhysicsMutex);
+        std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
+
+        // If we are deferring and this is NOT the deferred flush call, just queue them
+        if (mDeferring && &parts != &mDeferredParts) {
+            mDeferredParts.insert(mDeferredParts.end(), parts.begin(), parts.end());
+            return;
+        }
+
         JPH::BodyInterface &bi = physicsSystem->GetBodyInterface();
         JPH::BodyIDVector bodiesToAdd;
 
         for (auto& part : parts) {
             if (!part || !part->basePartProps) continue;
+            if (!part->physicsBodyID.IsInvalid()) continue; // Already registered
 
             auto& props = *part->basePartProps;
             auto cf = props.CFrame.get().to_nova();
-            auto size = props.size.to_glm();
+            auto size = props.Size.get().to_glm();
 
             float minDim = 0.05f;
             float hx = std::max(minDim, size.x * 0.5f);
@@ -196,8 +216,9 @@ namespace Nova {
 
             if (!shapeResult.IsValid()) continue;
 
-            JPH::EMotionType motionType = props.Anchored ? JPH::EMotionType::Static : JPH::EMotionType::Dynamic;
-            JPH::ObjectLayer layer = props.Anchored ? Layers::NON_MOVING : Layers::MOVING;
+            bool anchored = props.Anchored;
+            JPH::EMotionType motionType = anchored ? JPH::EMotionType::Static : JPH::EMotionType::Dynamic;
+            JPH::ObjectLayer layer = anchored ? Layers::NON_MOVING : Layers::MOVING;
 
             glm::quat q = glm::normalize(glm::quat_cast(cf.rotation));
 
@@ -213,10 +234,7 @@ namespace Nova {
             bodySettings.mUserData = (uint64_t)part.get();
 
             if (motionType == JPH::EMotionType::Dynamic) {
-                auto size = props.size.to_glm();
                 float volume = size.x * size.y * size.z;
-
-                // If the brick is small, use CCD
                 if (volume < 5.0f) {
                     bodySettings.mMotionQuality = JPH::EMotionQuality::LinearCast;
                 }
@@ -238,7 +256,7 @@ namespace Nova {
     }
 
     void PhysicsService::UnregisterPart(std::shared_ptr<BasePart> part) {
-        std::lock_guard<std::mutex> lock(mPhysicsMutex);
+        std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
         if (part->physicsBodyID.IsInvalid()) return;
         physicsSystem->GetBodyInterface().RemoveBody(part->physicsBodyID);
         physicsSystem->GetBodyInterface().DestroyBody(part->physicsBodyID);
@@ -276,18 +294,23 @@ namespace Nova {
         updates.reserve(activeBodies.size());
 
         for (const auto& id : activeBodies) {
+            // Static bodies shouldn't be in activeBodies anyway, but we check for safety
+            if (bi.GetMotionType(id) == JPH::EMotionType::Static) continue;
+
+            uint64_t userData = bi.GetUserData(id);
+            if (userData == 0) continue;
+
+            BasePart* partPtr = reinterpret_cast<BasePart*>(userData);
+
             JPH::RVec3 pos;
             JPH::Quat rot;
             bi.GetPositionAndRotation(id, pos, rot);
 
-            auto it = bodyToPartMap.find(id);
-            if (it != bodyToPartMap.end()) {
-                TransformUpdate update;
-                update.part = it->second;
-                update.position = glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ());
-                update.rotation = glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ());
-                updates.push_back(std::move(update));
-            }
+            TransformUpdate update;
+            update.part = std::static_pointer_cast<BasePart>(partPtr->shared_from_this());
+            update.position = glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ());
+            update.rotation = glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ());
+            updates.push_back(std::move(update));
         }
 
         {

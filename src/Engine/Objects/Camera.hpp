@@ -17,7 +17,7 @@ namespace Nova {
     namespace Props {
         struct CameraProps {
             rfl::Flatten<InstanceProps> base;
-            rfl::Rename<"CoordinateFrame", CFrameReflect> CFrame;
+            CFrameReflect CFrame;
             CFrameReflect Focus;
             rfl::Rename<"CameraType", enum CameraType> CameraType = CameraType::Fixed;
             // float FieldOfView = 70.0f;
@@ -33,7 +33,7 @@ namespace Nova {
 
         glm::mat4 GetViewMatrix() {
             // The View matrix is the inverse of the Camera's World CFrame
-            return glm::inverse(props.CFrame.get().to_nova().to_mat4());
+            return glm::inverse(props.CFrame.to_nova().to_mat4());
         }
 
         NOVA_OBJECT(Camera, props)

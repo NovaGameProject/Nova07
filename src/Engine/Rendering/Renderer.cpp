@@ -100,7 +100,7 @@ namespace Nova {
     ) {
         glm::vec3 cameraPos(0, 0, 0);
         if (workspace->CurrentCamera) {
-            cameraPos = workspace->CurrentCamera->props.CFrame.get().to_nova().position;
+            cameraPos = workspace->CurrentCamera->props.CFrame.to_nova().position;
         }
 
         for (auto& physical : workspace->cachedParts) {
@@ -145,7 +145,7 @@ namespace Nova {
             glm::vec3 cameraPos(50, 50, 50);
             if (workspace->CurrentCamera) {
                 view = workspace->CurrentCamera->GetViewMatrix();
-                cameraPos = workspace->CurrentCamera->props.CFrame.get().to_nova().position;
+                cameraPos = workspace->CurrentCamera->props.CFrame.to_nova().position;
             } else {
                 view = glm::lookAtRH(cameraPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
             }
@@ -227,20 +227,20 @@ namespace Nova {
 
             if (skyboxPipeline && skyboxTexture) {
                 SDL_BindGPUGraphicsPipeline(pass, skyboxPipeline);
-                
+
                 // View matrix without translation
                 // HLSL mul(mvp, pos) with column_major expects the same layout as GLM
                 glm::mat4 skyView = glm::mat4(glm::mat3(view));
                 glm::mat4 skyMVP = proj * skyView;
-                
+
                 SDL_PushGPUVertexUniformData(cmd, 0, &skyMVP, sizeof(glm::mat4));
-                
+
                 SDL_GPUTextureSamplerBinding skyBinding = { .texture = skyboxTexture, .sampler = surfaceSampler };
                 SDL_BindGPUFragmentSamplers(pass, 0, &skyBinding, 1);
 
                 SDL_GPUBufferBinding vBinding = { .buffer = cubeBuffer, .offset = 0 };
                 SDL_BindGPUVertexBuffers(pass, 0, &vBinding, 1);
-                
+
                 SDL_DrawGPUPrimitives(pass, 36, 1, 0, 0);
             }
 

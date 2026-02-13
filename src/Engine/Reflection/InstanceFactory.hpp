@@ -12,6 +12,7 @@
 #include <functional>
 #include <map>
 #include "Engine/Nova.hpp"
+#include "Engine/Services/ScriptContext.hpp"
 
 namespace Nova {
     class InstanceFactory {
@@ -56,6 +57,7 @@ namespace Nova {
             // Register<Decal>("Decal"); TODO: implement later, when we add ContentId (for loading stuff from site) and Base64: consider converting to ContentId when
             // SaaS (hosted Nova as platform)
             Register<Sky>("Sky");
+            Register<ScriptContext>("ScriptContext");
 
             // Containers
             Register<Model>("Model");

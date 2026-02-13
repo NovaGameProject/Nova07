@@ -24,5 +24,7 @@ namespace Nova {
             s->SetParent(shared_from_this());
             return s;
         }
+
+        std::shared_ptr<Instance> GetService(const std::string& className);
     };
 }

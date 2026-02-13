@@ -45,4 +45,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Jolt::Jolt
     pugixml::static
     Tracy::TracyClient
+    unofficial::luau::Luau.VM
+    unofficial::luau::Luau.Compiler
+    unofficial::luau::Luau.Ast
+    unofficial::luau::Luau.Common
 )

@@ -91,6 +91,12 @@ namespace Nova {
         pugi::xml_document doc;
         if (!doc.load_file(path.c_str())) return;
 
+        std::shared_ptr<PhysicsService> physics = nullptr;
+        if (auto dm = std::dynamic_pointer_cast<DataModel>(dataModel)) {
+            physics = dm->GetService<PhysicsService>();
+            if (physics) physics->SetDeferRegistration(true);
+        }
+
         auto roblox = doc.child("roblox");
 
         // Pass 1: Build the tree and the Referent Map
@@ -124,13 +130,16 @@ namespace Nova {
                 }
             }
 
-            // Register all physical parts into the PhysicsService
-            auto physics = dm->GetService<PhysicsService>();
-            std::vector<std::shared_ptr<BasePart>> parts;
-            FindAllBaseParts(dm, parts);
-            SDL_Log("Registering %zu parts with PhysicsService", parts.size());
-            physics->BulkRegisterParts(parts);
             workspace->RefreshCachedParts();
+        }
+
+        if (physics) {
+            physics->SetDeferRegistration(false);
+            
+            // Initialize physics interpolation state for all parts
+            std::vector<std::shared_ptr<BasePart>> parts;
+            FindAllBaseParts(dataModel, parts);
+            for (auto& part : parts) part->InitializePhysics();
         }
 
         referentMap.clear(); // Clean up memory
@@ -152,10 +161,8 @@ namespace Nova {
         }
 
         if (!inst) {
-            // Now "Part" will always result in a new creation
             inst = InstanceFactory::Get().Create(className);
             if (!inst) return;
-            inst->SetParent(parent);
         }
 
         if (!refId.empty()) referentMap[refId] = inst;
@@ -167,6 +174,12 @@ namespace Nova {
         for (auto prop : propsNode.children()) {
             std::string type = prop.name();
             std::string name = prop.attribute("name").value();
+
+            // Normalize names to match C++ struct (PascalCase)
+            if (name == "anchored") name = "Anchored";
+            if (name == "canCollide") name = "CanCollide";
+            if (name == "CoordinateFrame") name = "CFrame";
+            if (name == "size") name = "Size";
 
             if (type == "string") propMap[name] = rfl::Generic(std::string(prop.text().get()));
             else if (type == "bool")   propMap[name] = rfl::Generic(prop.text().as_bool());
@@ -204,9 +217,6 @@ namespace Nova {
                 cf["r21"] = rfl::Generic(static_cast<float>(prop.child("R21").text().as_float()));
                 cf["r22"] = rfl::Generic(static_cast<float>(prop.child("R22").text().as_float()));
 
-                // CRITICAL: The key here MUST match the variable name in your PartProps struct.
-                // If your struct has 'CFrameReflect CFrame;', this MUST be "CFrame".
-                // If your struct has 'CFrameReflect cframe;', this MUST be "cframe".
                 propMap[name] = rfl::Generic(cf);
             }
             else if (type == "Color3") {
@@ -226,9 +236,6 @@ namespace Nova {
                 } else {
                     // stoul handles the large unsigned integer string
                     uint32_t packed = std::stoul(val);
-                    // 2007 Format: Typically (R << 16) | (G << 8) | B
-                    // But if it's a signed negative (like 4278190080 which is 0xFF000000)
-                    // we just mask the bytes.
                     col["r"] = rfl::Generic((float)((packed >> 16) & 0xFF) / 255.0f);
                     col["g"] = rfl::Generic((float)((packed >> 8) & 0xFF) / 255.0f);
                     col["b"] = rfl::Generic((float)(packed & 0xFF) / 255.0f);
@@ -240,7 +247,12 @@ namespace Nova {
         // 3. Apply everything via reflection
         inst->ApplyPropertiesGeneric(rfl::Generic(propMap));
 
-        // 4. Recurse children
+        // 4. Set parent (triggers OnAncestorChanged and physics registration)
+        if (parent && !inst->GetParent()) {
+            inst->SetParent(parent);
+        }
+
+        // 5. Recurse children
         for (auto child : node.children("Item")) {
             ProcessItemPass1(child, inst);
         }

@@ -19,8 +19,20 @@
 #include <rfl/to_generic.hpp>
 #include <rfl/Object.hpp>
 
+#include <lua.h>
+#include <lualib.h>
+
+// Avoid Luau macro / LuaBridge helper collision
+#ifndef LUABRIDGE_USING_LUAU
+#define LUABRIDGE_USING_LUAU
+#endif
+#undef lua_rawgetp
+#undef lua_rawsetp
+#include <luabridge3/LuaBridge/LuaBridge.h>
 
 namespace Nova {
+    class DataModel;
+
     namespace Props {
         struct InstanceProps {
             rfl::Rename<"Name", std::string> Name;
@@ -84,6 +96,7 @@ namespace Nova {
                 auto result = rfl::from_generic<decltype(this->PropsMember), rfl::UnderlyingEnums>(generic); \
                 if (result) { \
                     this->PropsMember = result.value(); \
+                    OnPropertyChanged(name); \
                     return true; \
                 } \
             } \
@@ -119,6 +132,8 @@ namespace Nova {
         virtual rfl::Generic GetProperty(const std::string& name) const = 0;
         virtual bool SetProperty(const std::string& name, const rfl::Generic& value) = 0;
 
+        virtual void OnPropertyChanged(const std::string& name) {}
+
         std::weak_ptr<Instance> parent;
         std::vector<std::shared_ptr<Instance>> children;
 
@@ -135,8 +150,21 @@ namespace Nova {
                 c.erase(std::remove(c.begin(), c.end(), self), c.end());
             }
             parent = newParent;
-            if (newParent) newParent->children.push_back(self);
+            if (newParent) {
+                newParent->children.push_back(self);
+            }
+            
+            OnAncestorChanged(self, newParent);
         }
+
+        std::shared_ptr<DataModel> GetDataModel();
+        bool IsDescendantOf(std::shared_ptr<Instance> other);
+
+        virtual void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent);
+
+        // Lua Meta Methods for dynamic properties (Static version for reliable binding)
+        static luabridge::LuaRef LuaIndex(Instance& self, const luabridge::LuaRef& key, lua_State* L);
+        static luabridge::LuaRef LuaNewIndex(Instance& self, const luabridge::LuaRef& key, const luabridge::LuaRef& value, lua_State* L);
 
         bool IsRoot() const { return parent.expired(); }
     };
