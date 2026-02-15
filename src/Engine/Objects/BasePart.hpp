@@ -86,6 +86,22 @@ namespace Nova {
             return glm::vec4(rgb, 1.0f - basePartProps->Transparency);
         }
 
+        SurfaceType GetSurfaceType(glm::vec3 localNormal) {
+            if (!basePartProps) return SurfaceType::Smooth;
+            
+            // Map normal to face
+            if (localNormal.y > 0.8f) return basePartProps->TopSurface;
+            if (localNormal.y < -0.8f) return basePartProps->BottomSurface;
+            if (localNormal.x > 0.8f) return basePartProps->RightSurface;
+            if (localNormal.x < -0.8f) return basePartProps->LeftSurface;
+            if (localNormal.z > 0.8f) return basePartProps->BackSurface;
+            if (localNormal.z < -0.8f) return basePartProps->FrontSurface;
+            
+            return SurfaceType::Smooth;
+        }
+
+        void BreakJoints();
+
         void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
         void OnPropertyChanged(const std::string& name) override;
     };

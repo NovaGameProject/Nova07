@@ -19,14 +19,18 @@
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 #include <vector>
 #include <atomic>
 
 namespace Nova {
 
     class BasePart;
+    class JointInstance;
+    enum class SurfaceType : int;
 
     // Layer definitions for Jolt
     namespace Layers {
@@ -44,6 +48,14 @@ namespace Nova {
     struct ContactEvent {
         std::weak_ptr<BasePart> part1;
         std::weak_ptr<BasePart> part2;
+    };
+
+    struct JointRequest {
+        std::weak_ptr<BasePart> part1;
+        std::weak_ptr<BasePart> part2;
+        SurfaceType surface1;
+        SurfaceType surface2;
+        JPH::Constraint* physicsConstraint = nullptr;
     };
 
     class PhysicsService : public Instance {
@@ -65,21 +77,29 @@ namespace Nova {
         void BulkUnregisterParts(const std::vector<std::shared_ptr<BasePart>>& parts);
         void UnregisterPart(std::shared_ptr<BasePart> part);
 
+        // Joint Management
+        void RegisterConstraint(JointInstance* joint);
+        void UnregisterConstraint(JointInstance* joint);
+
         JPH::PhysicsSystem* GetPhysicsSystem() { return physicsSystem; }
 
         // Performance Optimization: Defer registration during level load
         void SetDeferRegistration(bool defer);
         bool IsDeferring() const { return mDeferring; }
 
-    private:
-        void SyncTransforms();
-        void ProcessQueuedMutations(); // Run on Physics Thread
+        // Deduplication helper
+        bool HasJointBetween(BasePart* p1, BasePart* p2);
 
+        // Assembly Management (for "Fake" Rigidity)
+        void RequestAssemblyUpdate(BasePart* part);
+        void BreakJoints(BasePart* part);
+        void BreakJointsInRadius(glm::vec3 position, float radius);
 
-        // Jolt Boilerplate
-        JPH::PhysicsSystem* physicsSystem;
-        JPH::TempAllocatorImpl* tempAllocator;
-        JPH::JobSystemThreadPool* jobSystem;
+        struct InternalJoint {
+            std::weak_ptr<BasePart> part1;
+            std::weak_ptr<BasePart> part2;
+            JPH::Constraint* physicsConstraint = nullptr;
+        };
 
         // Mapping for state sync (using unordered_map for O(1) average lookup)
         struct BodyIDHasher {
@@ -88,6 +108,19 @@ namespace Nova {
             }
         };
         std::unordered_map<JPH::BodyID, std::weak_ptr<BasePart>, BodyIDHasher> bodyToPartMap;
+
+    private:
+        void SyncTransforms();
+        void ProcessQueuedMutations(); // Run on Physics Thread
+        void UpdateAssemblies();       // Propagates static state through welds
+
+        // Jolt Boilerplate
+        JPH::PhysicsSystem* physicsSystem;
+        JPH::TempAllocatorImpl* tempAllocator;
+        JPH::JobSystemThreadPool* jobSystem;
+
+        std::unordered_map<BasePart*, std::vector<std::weak_ptr<JointInstance>>> mPartToJoints;
+        std::unordered_map<BasePart*, std::vector<std::shared_ptr<InternalJoint>>> mPartToAutoJoints;
 
         // Threading
         std::thread mThread;
@@ -104,6 +137,22 @@ namespace Nova {
         std::mutex mQueueMutex;
         std::vector<std::shared_ptr<BasePart>> mPendingRegisters;
         std::vector<JPH::BodyID> mPendingRemovals;
+        std::vector<std::shared_ptr<JointInstance>> mPendingConstraints;
+        std::vector<JPH::Constraint*> mPendingConstraintRemovals;
+        std::vector<JointRequest> mPendingAutoJoints;
+        std::vector<JPH::Constraint*> mInternalJointsToRemove;
+        std::vector<std::shared_ptr<InternalJoint>> mActiveAutoJoints;
+        std::vector<BasePart*> mPendingAssemblyUpdates;
+
+        // Tracks part-part connections to prevent redundant joints/explosions
+        using PartPair = std::pair<uint64_t, uint64_t>;
+        struct PartPairHasher {
+            size_t operator()(const PartPair& p) const {
+                return std::hash<uint64_t>{}(p.first) ^ (std::hash<uint64_t>{}(p.second) << 1);
+            }
+        };
+        std::unordered_set<PartPair, PartPairHasher> mJoinedPairs;
+        mutable std::shared_mutex mJoinedPairsMutex;
 
         // Deferred registration state (during Level Load)
         bool mDeferring = false;

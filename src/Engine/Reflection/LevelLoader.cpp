@@ -280,6 +280,16 @@ namespace Nova {
                         mod->PrimaryPart = target;
                     }
                 }
+                else if (propName == "Part0" || propName == "part0") {
+                    if (auto joint = std::dynamic_pointer_cast<JointInstance>(inst)) {
+                        joint->Part0 = std::dynamic_pointer_cast<BasePart>(target);
+                    }
+                }
+                else if (propName == "Part1" || propName == "part1") {
+                    if (auto joint = std::dynamic_pointer_cast<JointInstance>(inst)) {
+                        joint->Part1 = std::dynamic_pointer_cast<BasePart>(target);
+                    }
+                }
                 else if (propName == "CurrentCamera") {
                     if (auto ws = std::dynamic_pointer_cast<Workspace>(inst)) {
                         if (auto cam = std::dynamic_pointer_cast<Camera>(target)) {

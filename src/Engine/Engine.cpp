@@ -8,12 +8,7 @@
 
 #include "Engine/Engine.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
-#include "Engine/Objects/Sky.hpp"
-#include "Engine/Objects/Camera.hpp"
-#include "Engine/Services/Lighting.hpp"
-#include "Engine/Services/PhysicsService.hpp"
-#include "Engine/Services/Workspace.hpp"
-#include "Engine/Services/ScriptContext.hpp"
+#include "Engine/Nova.hpp"
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>

@@ -22,9 +22,11 @@
 #include "Engine/Objects/Model.hpp"
 #include "Engine/Objects/SpawnLocation.hpp"
 #include "Engine/Objects/Sky.hpp"
+#include "Engine/Objects/JointInstance.hpp"
 
 // Services
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/Lighting.hpp"
 #include "Engine/Services/PhysicsService.hpp"
+#include "Engine/Services/ScriptContext.hpp"

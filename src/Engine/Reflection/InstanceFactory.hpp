@@ -12,7 +12,8 @@
 #include <functional>
 #include <map>
 #include "Engine/Nova.hpp"
-#include "Engine/Services/ScriptContext.hpp"
+
+#include "Engine/Objects/Explosion.hpp"
 
 namespace Nova {
     class InstanceFactory {
@@ -61,6 +62,14 @@ namespace Nova {
 
             // Containers
             Register<Model>("Model");
+
+            // Joints
+            Register<AutoJoint>("AutoJoint");
+            Register<Weld>("Weld");
+            Register<Snap>("Snap");
+            Register<Glue>("Glue");
+            Register<Motor>("Motor");
+            Register<Explosion>("Explosion");
         }
     };
 }

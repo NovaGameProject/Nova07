@@ -7,8 +7,7 @@
 // (at your option) any later version.
 
 #include "Engine/Engine.hpp"
-#include "Engine/Services/DataModel.hpp"
-#include "Engine/Services/ScriptContext.hpp"
+#include "Engine/Nova.hpp"
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -18,7 +17,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    engine.LoadLevel("./resources/Places/HappyHomeInRobloxiaBaseNoCollision.rbxl");
+    engine.LoadLevel("./resources/Places/HappyHomeInRobloxia.rbxl");
 
     auto scriptContext = engine.GetDataModel()->GetService<Nova::ScriptContext>();
 
@@ -40,6 +39,13 @@ int main(int argc, char* argv[]) {
         -- Test signal connection
         p.Touched:Connect(function(other)
             print("Part touched by " .. other.Name)
+
+            local explosion = Instance.new("Explosion")
+            explosion.Position = p.Position
+            explosion.BlastRadius = 10000
+            explosion.BlastPressure = 100000000
+            print(p.Position, explosion.Position)
+            explosion.Parent = workspace
         end)
         print("Connected to Touched signal")
     )");

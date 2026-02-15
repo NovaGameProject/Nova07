@@ -18,8 +18,39 @@ struct CFrame {
     Vector3 position = {0,0,0};
     glm::mat3 rotation = glm::mat3(1.0f);
 
+    // Identity CFrame
+    CFrame() {}
+    CFrame(Vector3 pos) : position(pos) {}
+    CFrame(Vector3 pos, glm::mat3 rot) : position(pos), rotation(rot) {}
+
+    // Multiplies two CFrames
+    CFrame operator*(const CFrame& other) const {
+        return CFrame(
+            position + (rotation * other.position),
+            rotation * other.rotation
+        );
+    }
+
+    // Inverts the CFrame
+    CFrame inverse() const {
+        glm::mat3 invRot = glm::transpose(rotation); // Orthogonal matrix inverse is transpose
+        return CFrame(
+            invRot * (-position),
+            invRot
+        );
+    }
+
+    // Converts world space CFrame to local space relative to this CFrame
+    CFrame to_object_space(const CFrame& world) const {
+        return this->inverse() * world;
+    }
+
+    // Converts local space CFrame relative to this CFrame back to world space
+    CFrame to_world_space(const CFrame& local) const {
+        return (*this) * local;
+    }
+
     // This converts your CFrame into the 4x4 matrix used for Rendering/Physics
-    // Explicit version for MathTypes.hpp
     glm::mat4 to_mat4() const {
         glm::mat4 m(1.0f);
         m[0] = glm::vec4(rotation[0], 0.0f); // Basis X

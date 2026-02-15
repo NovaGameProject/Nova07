@@ -7,25 +7,30 @@
 // (at your option) any later version.
 
 #include "Engine/Reflection/ClassDescriptor.hpp"
-#include "Engine/Objects/BasePart.hpp"
-#include "Engine/Objects/Part.hpp"
-#include "Engine/Services/Workspace.hpp"
-#include "Engine/Services/DataModel.hpp"
-#include "Engine/Services/ScriptContext.hpp"
-#include "Engine/Objects/Model.hpp"
+#include "Engine/Nova.hpp"
+#include "Engine/Objects/Explosion.hpp"
+
 
 namespace Nova {
     void RegisterClasses() {
         // We can use the builder to register signals/methods
         ClassDescriptorBuilder<BasePart>("BasePart", "Instance")
             .Signal("Touched", &BasePart::Touched);
-        
+
         ClassDescriptorBuilder<Part>("Part", "BasePart");
-        
+
         ClassDescriptorBuilder<Workspace>("Workspace", "Instance");
         ClassDescriptorBuilder<DataModel>("DataModel", "Instance");
         ClassDescriptorBuilder<ScriptContext>("ScriptContext", "Instance");
         ClassDescriptorBuilder<Model>("Model", "Instance");
+
+        ClassDescriptorBuilder<JointInstance>("JointInstance", "Instance");
+        ClassDescriptorBuilder<AutoJoint>("AutoJoint", "JointInstance");
+        ClassDescriptorBuilder<Weld>("Weld", "JointInstance");
+        ClassDescriptorBuilder<Snap>("Snap", "JointInstance");
+        ClassDescriptorBuilder<Glue>("Glue", "JointInstance");
+        ClassDescriptorBuilder<Motor>("Motor", "JointInstance");
+        ClassDescriptorBuilder<Explosion>("Explosion", "Instance");
 
         // ... more classes ...
     }

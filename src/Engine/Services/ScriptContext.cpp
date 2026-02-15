@@ -122,9 +122,18 @@ namespace Nova {
 
         luabridge::getGlobalNamespace(L).deriveClass<Workspace, Instance>("Workspace").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Lighting, Instance>("Lighting").endClass();
-        luabridge::getGlobalNamespace(L).deriveClass<BasePart, Instance>("BasePart").endClass();
+        luabridge::getGlobalNamespace(L)
+            .deriveClass<BasePart, Instance>("BasePart")
+                .addFunction("BreakJoints", &BasePart::BreakJoints)
+            .endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Part, BasePart>("Part").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Model, Instance>("Model").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<JointInstance, Instance>("JointInstance").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<AutoJoint, JointInstance>("AutoJoint").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Weld, JointInstance>("Weld").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Snap, JointInstance>("Snap").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Glue, JointInstance>("Glue").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Motor, JointInstance>("Motor").endClass();
     }
 
     void ScriptContext::SetDataModel(std::shared_ptr<DataModel> dataModel) {
