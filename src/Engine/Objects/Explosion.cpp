@@ -7,9 +7,12 @@
 // (at your option) any later version.
 
 #include "Engine/Objects/Explosion.hpp"
+#include "Engine/Objects/BasePart.hpp"
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
+#include <glm/glm.hpp>
+#include <iostream>
 
 namespace Nova {
     Explosion::Explosion() : Instance("Explosion") {}
@@ -22,10 +25,35 @@ namespace Nova {
             auto workspace = dm->GetService<Workspace>();
             if (IsDescendantOf(workspace)) {
                 if (auto physics = dm->GetService<PhysicsService>()) {
-                    physics->BreakJointsInRadius(props.Position.get().to_glm(), props.BlastRadius);
-                    // In a real implementation, we'd also apply impulsed to bodies here.
+                    glm::vec3 pos = props.Position.get().to_glm();
+                    float radius = props.BlastRadius;
+                    
+                    std::cout << "[Explosion] Queuing explosion at (" << pos.x << ", " << pos.y << ", " << pos.z 
+                              << ") with radius " << radius << std::endl;
+                    
+                    // Queue the explosion for processing on the physics thread
+                    // This prevents race conditions with the physics simulation
+                    physics->QueueExplosion(pos, radius, props.BlastPressure);
+                    
+                    // Start visual effect
+                    m_visualActive = true;
+                    m_visualTime = 0.0f;
+                    
+                    // Note: Hit signal will be fired by PhysicsService when processing the explosion
+                    // This is handled internally by the physics thread
                 }
             }
+        }
+    }
+    
+    void Explosion::UpdateVisual(float dt) {
+        if (!m_visualActive) return;
+        
+        m_visualTime += dt;
+        if (m_visualTime >= m_visualDuration) {
+            m_visualActive = false;
+            // Remove self from parent after effect completes
+            SetParent(nullptr);
         }
     }
 }

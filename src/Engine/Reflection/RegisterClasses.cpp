@@ -9,6 +9,8 @@
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Engine/Nova.hpp"
 #include "Engine/Objects/Explosion.hpp"
+#include "Engine/Objects/Script.hpp"
+#include "Engine/Objects/LocalScript.hpp"
 
 
 namespace Nova {
@@ -30,7 +32,12 @@ namespace Nova {
         ClassDescriptorBuilder<Snap>("Snap", "JointInstance");
         ClassDescriptorBuilder<Glue>("Glue", "JointInstance");
         ClassDescriptorBuilder<Motor>("Motor", "JointInstance");
-        ClassDescriptorBuilder<Explosion>("Explosion", "Instance");
+        ClassDescriptorBuilder<Explosion>("Explosion", "Instance")
+            .Signal("Hit", &Explosion::Hit);
+        ClassDescriptorBuilder<Script>("Script", "Instance");
+        ClassDescriptorBuilder<LocalScript>("LocalScript", "Script");
+        ClassDescriptorBuilder<Hinge>("Hinge", "JointInstance");
+        ClassDescriptorBuilder<VelocityMotor>("VelocityMotor", "JointInstance");
 
         // ... more classes ...
     }

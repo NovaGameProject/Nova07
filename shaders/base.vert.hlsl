@@ -1,3 +1,5 @@
+#pragma pack_matrix(column_major)
+
 struct VSInput {
     [[vk::location(0)]] float3 pos : TEXCOORD0;
     [[vk::location(1)]] float3 normal : TEXCOORD1;
@@ -7,6 +9,9 @@ struct LightingData {
     float4 topAmbient;
     float4 bottomAmbient;
     float4 lightDir;
+    float4 fogColor;
+    float4 fogParams; // x: start, y: end, z: enabled
+    float4 cameraPos;
 };
 
 // Set 1 for Vertex Uniforms in SPIR-V
@@ -19,6 +24,7 @@ struct VSOutput {
     float4 color : TEXCOORD0;
     float2 uv : TEXCOORD1;
     uint surfaceIndex : TEXCOORD3;
+    float viewDist : TEXCOORD4;
 };
 
 struct InstanceData {
@@ -35,8 +41,12 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID, uint vertexID : SV
     VSOutput output;
     InstanceData data = instanceData[instanceID];
 
+    float4 worldPos = mul(data.model, float4(input.pos, 1.0f));
     output.pos = mul(data.mvp, float4(input.pos, 1.0f));
-    
+
+    // Calculate actual distance from camera
+    output.viewDist = distance(worldPos.xyz, lighting.cameraPos.xyz);
+
     // Determine which surface this is (Z+, Z-, X-, X+, Y+, Y-)
     uint faceIdx = vertexID / 6;
     output.surfaceIndex = uint(data.surfaces[faceIdx]);
@@ -64,15 +74,15 @@ VSOutput main(VSInput input, uint instanceID : SV_InstanceID, uint vertexID : SV
     float3x3 normalMatrix = (float3x3)data.model;
     float3 N = normalize(mul(normalMatrix, input.normal));
     float3 L = normalize(lighting.lightDir.xyz);
-    
+
     float diffuse = max(0.0, dot(N, L));
     float ambientWeight = N.y * 0.5 + 0.5;
     float3 ambient = lerp(lighting.bottomAmbient.rgb, lighting.topAmbient.rgb, ambientWeight);
-    
+
     float3 lightColor = float3(1.0, 1.0, 1.0);
     float3 finalRGB = data.color.rgb * (ambient + lightColor * diffuse);
-    
+
     output.color = float4(finalRGB, data.color.a);
-    
+
     return output;
 }

@@ -90,4 +90,44 @@ namespace Nova {
         void RebuildConstraint() override;
     };
 
+    // Hinge joint - allows rotation about one axis with optional limits
+    namespace Props {
+        struct HingeProps {
+            rfl::Flatten<JointProps> base;
+            float LowerAngle = 0.0f;
+            float UpperAngle = 0.0f;
+            bool LimitsEnabled = false;
+        };
+    }
+
+    class Hinge : public JointInstance {
+    public:
+        Props::HingeProps props;
+        NOVA_OBJECT(Hinge, props)
+        Hinge() : JointInstance("Hinge") {}
+        void RebuildConstraint() override;
+        
+        float GetCurrentAngle();
+    };
+
+    // VelocityMotor - motor with velocity control (2007 ROBLOX style)
+    namespace Props {
+        struct VelocityMotorProps {
+            rfl::Flatten<JointProps> base;
+            float MaxVelocity = 1.0f;
+            float DesiredAngle = 0.0f;
+        };
+    }
+
+    class VelocityMotor : public JointInstance {
+    public:
+        Props::VelocityMotorProps props;
+        NOVA_OBJECT(VelocityMotor, props)
+        VelocityMotor() : JointInstance("VelocityMotor") {}
+        void RebuildConstraint() override;
+        
+        float GetCurrentAngle();
+        void SetTargetVelocity(float velocity);
+    };
+
 }

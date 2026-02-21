@@ -14,6 +14,8 @@
 #include "Engine/Nova.hpp"
 
 #include "Engine/Objects/Explosion.hpp"
+#include "Engine/Objects/Script.hpp"
+#include "Engine/Objects/LocalScript.hpp"
 
 namespace Nova {
     class InstanceFactory {
@@ -69,6 +71,10 @@ namespace Nova {
             Register<Snap>("Snap");
             Register<Glue>("Glue");
             Register<Motor>("Motor");
+            Register<Script>("Script");
+            Register<LocalScript>("LocalScript");
+            Register<Hinge>("Hinge");
+            Register<VelocityMotor>("VelocityMotor");
             Register<Explosion>("Explosion");
         }
     };

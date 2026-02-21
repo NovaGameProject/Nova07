@@ -7,6 +7,8 @@
 // (at your option) any later version.
 
 #include "Engine/Objects/Instance.hpp"
+#include "Engine/Objects/BasePart.hpp"
+#include "Engine/Objects/InstanceFactory.hpp"
 #include "Engine/Reflection/TypeMarshaling.hpp"
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Engine/Services/DataModel.hpp"
@@ -85,14 +87,11 @@ namespace Nova {
         if (skey == "Parent") return luabridge::LuaRef(L, self.GetParent());
         if (skey == "ClassName") return luabridge::LuaRef(L, self.GetClassName());
 
-        // Helper: Position (mapped from CFrame)
-        if (skey == "Position") {
-            rfl::Generic cfGen = self.GetProperty("CFrame");
-            if (!std::holds_alternative<std::nullopt_t>(cfGen.variant())) {
-                auto cfResult = rfl::from_generic<CFrameReflect, rfl::UnderlyingEnums>(cfGen);
-                if (cfResult) {
-                    return luabridge::LuaRef(L, Vector3(cfResult->x, cfResult->y, cfResult->z));
-                }
+        // Helper: Velocity (for BasePart) - check early before property fallback
+        if (skey == "Velocity" || skey == "velocity") {
+            if (auto* basePart = dynamic_cast<BasePart*>(&self)) {
+                glm::vec3 vel = basePart->GetVelocity();
+                return luabridge::LuaRef(L, Vector3(vel.x, vel.y, vel.z));
             }
         }
 
@@ -116,7 +115,18 @@ namespace Nova {
             return genericToLua(L, prop);
         }
 
-        // 3. Try children
+        // 3. Helper: Position from CFrame (for BasePart)
+        if (skey == "Position") {
+            rfl::Generic cfGen = self.GetProperty("CFrame");
+            if (!std::holds_alternative<std::nullopt_t>(cfGen.variant())) {
+                auto cfResult = rfl::from_generic<CFrameReflect, rfl::UnderlyingEnums>(cfGen);
+                if (cfResult) {
+                    return luabridge::LuaRef(L, Vector3(cfResult->x, cfResult->y, cfResult->z));
+                }
+            }
+        }
+
+        // 4. Try children
         for (auto& child : self.children) {
             if (child->GetName() == skey) {
                 return luabridge::LuaRef(L, child);
@@ -168,6 +178,22 @@ namespace Nova {
             return luabridge::LuaRef(L);
         }
 
+        // Helper: Velocity (for BasePart)
+        if (skey == "Velocity" || skey == "velocity") {
+            if (auto* basePart = dynamic_cast<BasePart*>(&self)) {
+                luabridge::push(L, value);
+                if (luabridge::Stack<Vector3>::isInstance(L, -1)) {
+                    auto res = value.cast<Vector3>();
+                    if (res) {
+                        Vector3 vel = res.value();
+                        basePart->SetVelocity(glm::vec3(vel.x, vel.y, vel.z));
+                    }
+                }
+                lua_pop(L, 1);
+                return luabridge::LuaRef(L);
+            }
+        }
+
         rfl::Generic g = luaToGeneric(value);
         if (self.SetProperty(skey, g)) {
             return luabridge::LuaRef(L);
@@ -175,5 +201,123 @@ namespace Nova {
 
         std::cerr << "Failed to set property " << skey << " on " << self.GetClassName() << std::endl;
         return luabridge::LuaRef(L);
+    }
+
+    std::shared_ptr<Instance> Instance::FindFirstChild(const std::string& name, bool recursive) {
+        for (auto& child : children) {
+            if (child->GetName() == name) return child;
+        }
+        if (recursive) {
+            for (auto& child : children) {
+                if (auto found = child->FindFirstChild(name, true)) return found;
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Instance> Instance::FindFirstChildOfClass(const std::string& className) {
+        for (auto& child : children) {
+            if (child->GetClassName() == className) return child;
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Instance> Instance::FindFirstChildWhichIsA(const std::string& className, bool recursive) {
+        for (auto& child : children) {
+            if (child->IsA(className)) return child;
+        }
+        if (recursive) {
+            for (auto& child : children) {
+                if (auto found = child->FindFirstChildWhichIsA(className, true)) return found;
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Instance> Instance::FindFirstAncestor(const std::string& name) {
+        auto p = parent.lock();
+        while (p) {
+            if (p->GetName() == name) return p;
+            p = p->parent.lock();
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Instance> Instance::FindFirstAncestorOfClass(const std::string& className) {
+        auto p = parent.lock();
+        while (p) {
+            if (p->GetClassName() == className) return p;
+            p = p->parent.lock();
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<Instance> Instance::FindFirstAncestorWhichIsA(const std::string& className) {
+        auto p = parent.lock();
+        while (p) {
+            if (p->IsA(className)) return p;
+            p = p->parent.lock();
+        }
+        return nullptr;
+    }
+
+    std::vector<std::shared_ptr<Instance>> Instance::GetDescendants() {
+        std::vector<std::shared_ptr<Instance>> result;
+        for (auto& child : children) {
+            result.push_back(child);
+            auto childDescendants = child->GetDescendants();
+            result.insert(result.end(), childDescendants.begin(), childDescendants.end());
+        }
+        return result;
+    }
+
+    std::string Instance::GetFullName() {
+        std::string result = GetName();
+        auto p = parent.lock();
+        while (p && !std::dynamic_pointer_cast<DataModel>(p)) {
+            result = p->GetName() + "." + result;
+            p = p->parent.lock();
+        }
+        return result;
+    }
+
+    bool Instance::IsA(const std::string& className) {
+        std::string currentClass = GetClassName();
+        while (!currentClass.empty()) {
+            if (currentClass == className) return true;
+            auto desc = ClassDescriptor::Get(currentClass);
+            if (desc) currentClass = desc->baseClassName;
+            else break;
+        }
+        return false;
+    }
+
+    std::shared_ptr<Instance> Instance::Clone() {
+        auto inst = InstanceFactory::Get().Create(GetClassName());
+        if (!inst) return nullptr;
+        
+        inst->ApplyPropertiesGeneric(GetPropertiesGeneric());
+        
+        for (auto& child : children) {
+            auto childClone = child->Clone();
+            if (childClone) {
+                childClone->SetParent(inst);
+            }
+        }
+        
+        return inst;
+    }
+
+    void Instance::Destroy() {
+        if (m_destroyed) return;
+        m_destroyed = true;
+        
+        auto childrenCopy = children;
+        for (auto& child : childrenCopy) {
+            child->Destroy();
+        }
+        children.clear();
+        
+        SetParent(nullptr);
     }
 }

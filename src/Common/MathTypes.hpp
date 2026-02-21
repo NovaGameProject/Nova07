@@ -11,67 +11,73 @@
 #include <glm/gtc/quaternion.hpp>
 #include <rfl.hpp>
 
-using Vector3 = glm::vec3;
-using Color3 = glm::vec3;
-
-struct CFrame {
-    Vector3 position = {0,0,0};
-    glm::mat3 rotation = glm::mat3(1.0f);
-
-    // Identity CFrame
-    CFrame() {}
-    CFrame(Vector3 pos) : position(pos) {}
-    CFrame(Vector3 pos, glm::mat3 rot) : position(pos), rotation(rot) {}
-
-    // Multiplies two CFrames
-    CFrame operator*(const CFrame& other) const {
-        return CFrame(
-            position + (rotation * other.position),
-            rotation * other.rotation
-        );
-    }
-
-    // Inverts the CFrame
-    CFrame inverse() const {
-        glm::mat3 invRot = glm::transpose(rotation); // Orthogonal matrix inverse is transpose
-        return CFrame(
-            invRot * (-position),
-            invRot
-        );
-    }
-
-    // Converts world space CFrame to local space relative to this CFrame
-    CFrame to_object_space(const CFrame& world) const {
-        return this->inverse() * world;
-    }
-
-    // Converts local space CFrame relative to this CFrame back to world space
-    CFrame to_world_space(const CFrame& local) const {
-        return (*this) * local;
-    }
-
-    // This converts your CFrame into the 4x4 matrix used for Rendering/Physics
-    glm::mat4 to_mat4() const {
-        glm::mat4 m(1.0f);
-        m[0] = glm::vec4(rotation[0], 0.0f); // Basis X
-        m[1] = glm::vec4(rotation[1], 0.0f); // Basis Y
-        m[2] = glm::vec4(rotation[2], 0.0f); // Basis Z
-        m[3] = glm::vec4(position, 1.0f);    // Translation
-        return m;
-    }
-
-    auto reflect() const {
-        return std::array<float, 12>{
-            rotation[0][0], rotation[0][1], rotation[0][2],
-            rotation[1][0], rotation[1][1], rotation[1][2],
-            rotation[2][0], rotation[2][1], rotation[2][2],
-            position.x, position.y, position.z
-        };
-    }
-};
-
-
 namespace Nova {
+    using Vector3 = glm::vec3;
+    using Color3 = glm::vec3;
+
+    struct CFrame {
+        Vector3 position = {0,0,0};
+        glm::mat3 rotation = glm::mat3(1.0f);
+
+        // Identity CFrame
+        CFrame() {}
+        CFrame(Vector3 pos) : position(pos) {}
+        CFrame(Vector3 pos, glm::mat3 rot) : position(pos), rotation(rot) {}
+
+        // Multiplies two CFrames
+        CFrame operator*(const CFrame& other) const {
+            return CFrame(
+                position + (rotation * other.position),
+                rotation * other.rotation
+            );
+        }
+
+        // Inverts the CFrame
+        CFrame inverse() const {
+            glm::mat3 invRot = glm::transpose(rotation); // Orthogonal matrix inverse is transpose
+            return CFrame(
+                invRot * (-position),
+                invRot
+            );
+        }
+
+        // Converts world space CFrame to local space relative to this CFrame
+        CFrame to_object_space(const CFrame& world) const {
+            return this->inverse() * world;
+        }
+
+        // Converts local space CFrame relative to this CFrame back to world space
+        CFrame to_world_space(const CFrame& local) const {
+            return (*this) * local;
+        }
+
+        // This converts your CFrame into the 4x4 matrix used for Rendering/Physics
+        glm::mat4 to_mat4() const {
+            glm::mat4 m(1.0f);
+            m[0] = glm::vec4(rotation[0], 0.0f); // Basis X
+            m[1] = glm::vec4(rotation[1], 0.0f); // Basis Y
+            m[2] = glm::vec4(rotation[2], 0.0f); // Basis Z
+            m[3] = glm::vec4(position, 1.0f);    // Translation
+            return m;
+        }
+
+        static CFrame from_mat4(const glm::mat4& m) {
+            return CFrame(
+                glm::vec3(m[3]),
+                glm::mat3(m)
+            );
+        }
+
+        auto reflect() const {
+            return std::array<float, 12>{
+                rotation[0][0], rotation[0][1], rotation[0][2],
+                rotation[1][0], rotation[1][1], rotation[1][2],
+                rotation[2][0], rotation[2][1], rotation[2][2],
+                position.x, position.y, position.z
+            };
+        }
+    };
+
     // These are "dumb" versions for reflection only
     struct Vector3Reflect {
         float x, y, z;
@@ -95,8 +101,8 @@ namespace Nova {
 
 
     struct CFrameReflect {
-        float x, y, z;
-        float r00, r01, r02, r10, r11, r12, r20, r21, r22;
+        float x = 0, y = 0, z = 0;
+        float r00 = 1, r01 = 0, r02 = 0, r10 = 0, r11 = 1, r12 = 0, r20 = 0, r21 = 0, r22 = 1;
 
         CFrame to_nova() const {
             CFrame cf;

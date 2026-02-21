@@ -15,6 +15,7 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 
 namespace Nova {
 
@@ -56,11 +57,11 @@ namespace Nova {
         SDL_GPUTextureCreateInfo texInfo = {
             .type = SDL_GPU_TEXTURETYPE_2D_ARRAY,
             .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
             .width = tileW,
             .height = tileH,
             .layer_count_or_depth = 9,
-            .num_levels = 1
+            .num_levels = 7 // log2(64) + 1
         };
         surfaceTexture = SDL_CreateGPUTexture(device, &texInfo);
 
@@ -103,6 +104,7 @@ namespace Nova {
         }
 
         SDL_EndGPUCopyPass(copy);
+        SDL_GenerateMipmapsForGPUTexture(cmd, surfaceTexture);
         auto fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
         SDL_WaitForGPUFences(device, true, &fence, 1);
         SDL_ReleaseGPUFence(device, fence);
@@ -188,24 +190,25 @@ namespace Nova {
 
         if (skyboxTexture) SDL_ReleaseGPUTexture(device, skyboxTexture);
 
+        uint32_t width = (uint32_t)surfaces[0]->w;
+        uint32_t height = (uint32_t)surfaces[0]->h;
+        uint32_t numLevels = (uint32_t)std::floor(std::log2(std::max(width, height))) + 1;
+
         SDL_GPUTextureCreateInfo texInfo = {
             .type = SDL_GPU_TEXTURETYPE_CUBE,
             .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
-            .width = (uint32_t)surfaces[0]->w,
-            .height = (uint32_t)surfaces[0]->h,
+            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+            .width = width,
+            .height = height,
             .layer_count_or_depth = 6,
-            .num_levels = 1
+            .num_levels = numLevels
         };
         skyboxTexture = SDL_CreateGPUTexture(device, &texInfo);
 
-        uint32_t layerSize = surfaces[0]->w * surfaces[0]->h * 4;
+        uint32_t layerSize = width * height * 4;
         SDL_GPUTransferBufferCreateInfo ltInfo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = layerSize * 6 };
         auto ltBuf = SDL_CreateGPUTransferBuffer(device, &ltInfo);
         uint8_t* texData = (uint8_t*)SDL_MapGPUTransferBuffer(device, ltBuf, false);
-
-        uint32_t width = (uint32_t)surfaces[0]->w;
-        uint32_t height = (uint32_t)surfaces[0]->h;
 
         for (int i = 0; i < 6; i++) {
             std::memcpy(texData + (i * layerSize), surfaces[i]->pixels, layerSize);
@@ -243,6 +246,7 @@ namespace Nova {
             SDL_UploadToGPUTexture(copy, &texSrc, &texDst, false);
         }
         SDL_EndGPUCopyPass(copy);
+        SDL_GenerateMipmapsForGPUTexture(cmd, skyboxTexture);
         auto fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
         SDL_WaitForGPUFences(device, true, &fence, 1);
         SDL_ReleaseGPUFence(device, fence);

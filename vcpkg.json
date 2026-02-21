@@ -10,6 +10,7 @@
       "name": "sdl3-image",
       "features": ["jpeg", "png", "tiff", "webp"]
     },
+    "sdl3-shadercross",
     "reflectcpp",
     "luau",
     "luabridge3",

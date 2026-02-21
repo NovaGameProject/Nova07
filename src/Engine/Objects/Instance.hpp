@@ -160,6 +160,21 @@ namespace Nova {
         std::shared_ptr<Instance> GetParent() const { return parent.lock(); }
         const std::vector<std::shared_ptr<Instance>>& GetChildren() const { return children; }
 
+        // 2007 ROBLOX API Methods
+        std::shared_ptr<Instance> FindFirstChild(const std::string& name, bool recursive = false);
+        std::shared_ptr<Instance> FindFirstChildOfClass(const std::string& className);
+        std::shared_ptr<Instance> FindFirstChildWhichIsA(const std::string& className, bool recursive = false);
+        std::shared_ptr<Instance> FindFirstAncestor(const std::string& name);
+        std::shared_ptr<Instance> FindFirstAncestorOfClass(const std::string& className);
+        std::shared_ptr<Instance> FindFirstAncestorWhichIsA(const std::string& className);
+        
+        std::vector<std::shared_ptr<Instance>> GetDescendants();
+        std::string GetFullName();
+        
+        bool IsA(const std::string& className);
+        std::shared_ptr<Instance> Clone();
+        void Destroy();
+
         void SetParent(std::shared_ptr<Instance> newParent);
 
         std::shared_ptr<DataModel> GetDataModel();
@@ -172,5 +187,8 @@ namespace Nova {
         static luabridge::LuaRef LuaNewIndex(Instance& self, const luabridge::LuaRef& key, const luabridge::LuaRef& value, lua_State* L);
 
         bool IsRoot() const { return parent.expired(); }
+
+    protected:
+        bool m_destroyed = false;
     };
 }

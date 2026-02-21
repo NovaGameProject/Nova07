@@ -7,14 +7,14 @@
 // (at your option) any later version.
 
 #include "Engine/Services/DataModel.hpp"
-#include "Engine/Reflection/InstanceFactory.hpp"
+#include "Engine/Objects/InstanceFactory.hpp"
 
 namespace Nova {
     std::shared_ptr<Instance> DataModel::GetService(const std::string& className) {
         for (auto& child : children) {
             if (child->GetClassName() == className) return child;
         }
-        
+
         auto s = InstanceFactory::Get().Create(className);
         if (s) {
             s->SetParent(shared_from_this());

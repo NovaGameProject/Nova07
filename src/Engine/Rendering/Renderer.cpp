@@ -72,6 +72,11 @@ namespace Nova {
             .address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT,
             .address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT,
             .address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT,
+            .mip_lod_bias = 0.0f,
+            .max_anisotropy = 16.0f,
+            .min_lod = 0.0f,
+            .max_lod = 15.0f,
+            .enable_anisotropy = true,
         };
         surfaceSampler = SDL_CreateGPUSampler(device, &sInfo);
 
@@ -165,14 +170,20 @@ namespace Nova {
             }
 
             LightingData lData;
+            lData.cameraPos = glm::vec4(cameraPos, 1.0f);
+
             if (lighting) {
                 lData.topAmbient = glm::vec4(lighting->props.TopAmbientV9.to_glm(), 1.0f);
                 lData.bottomAmbient = glm::vec4(lighting->props.BottomAmbientV9.to_glm(), 1.0f);
                 lData.lightDir = glm::vec4(glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)), 1.0f);
+                lData.fogColor = glm::vec4(lighting->props.ClearColor.r, lighting->props.ClearColor.g, lighting->props.ClearColor.b, 1.0f);
+                lData.fogParams = glm::vec4(0.0f, 500.0f, 1.0f, 0.0f);
             } else {
                 lData.topAmbient = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
                 lData.bottomAmbient = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
                 lData.lightDir = glm::vec4(glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)), 1.0f);
+                lData.fogColor = glm::vec4(0.5f, 0.5f, 0.7f, 1.0f);
+                lData.fogParams = glm::vec4(0.0f, 500.0f, 1.0f, 0.0f);
             }
 
             std::vector<InstanceData> instances;
@@ -255,6 +266,7 @@ namespace Nova {
                 SDL_BindGPUFragmentSamplers(pass, 0, &tBinding, 1);
 
                 SDL_PushGPUVertexUniformData(cmd, 0, &lData, sizeof(LightingData));
+                SDL_PushGPUFragmentUniformData(cmd, 0, &lData, sizeof(LightingData));
                 SDL_DrawGPUPrimitives(pass, 36, instances.size(), 0, 0);
             }
             SDL_EndGPURenderPass(pass);

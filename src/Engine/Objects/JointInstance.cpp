@@ -10,6 +10,7 @@
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
+#include <Jolt/Physics/Constraints/HingeConstraint.h>
 
 namespace Nova {
 
@@ -79,6 +80,54 @@ namespace Nova {
                 physics->RegisterConstraint(this);
             }
         }
+    }
+
+    void Hinge::RebuildConstraint() {
+        if (auto dm = GetDataModel()) {
+            if (auto physics = dm->GetService<PhysicsService>()) {
+                physics->RegisterConstraint(this);
+            }
+        }
+    }
+    
+    float Hinge::GetCurrentAngle() {
+        if (!physicsConstraint) return 0.0f;
+        
+        auto physics = registeredService.lock();
+        if (!physics) return 0.0f;
+        
+        // Cast to hinge constraint and get angle
+        auto* hinge = static_cast<JPH::HingeConstraint*>(physicsConstraint);
+        return hinge->GetCurrentAngle();
+    }
+
+    void VelocityMotor::RebuildConstraint() {
+        if (auto dm = GetDataModel()) {
+            if (auto physics = dm->GetService<PhysicsService>()) {
+                physics->RegisterConstraint(this);
+            }
+        }
+    }
+    
+    float VelocityMotor::GetCurrentAngle() {
+        if (!physicsConstraint) return 0.0f;
+        
+        auto physics = registeredService.lock();
+        if (!physics) return 0.0f;
+        
+        auto* hinge = static_cast<JPH::HingeConstraint*>(physicsConstraint);
+        return hinge->GetCurrentAngle();
+    }
+    
+    void VelocityMotor::SetTargetVelocity(float velocity) {
+        if (!physicsConstraint) return;
+        
+        auto physics = registeredService.lock();
+        if (!physics) return;
+        
+        auto* hinge = static_cast<JPH::HingeConstraint*>(physicsConstraint);
+        hinge->SetMotorState(JPH::EMotorState::Velocity);
+        hinge->SetTargetAngularVelocity(velocity);
     }
 
 }

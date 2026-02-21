@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    engine.LoadLevel("./resources/Places/HappyHomeInRobloxia.rbxl");
+    engine.LoadLevel("./resources/Places/RobloxHQ.rbxl");
 
     auto scriptContext = engine.GetDataModel()->GetService<Nova::ScriptContext>();
 
@@ -26,12 +26,13 @@ int main(int argc, char* argv[]) {
     scriptContext->Execute("print('Game name: ' .. game.Name)");
     scriptContext->Execute("print('Workspace name: ' .. workspace.Name)");
 
-    // Test dynamic property access and children
+    // test kaboom!!! (spoiler: it works!!!!)
     scriptContext->Execute(R"(
+        local touched = false
         local p = Instance.new("Part")
         p.Name = "MyLuauPart"
         p.Parent = workspace
-        p.Position = Vector3.new(0, 100, 0)
+        p.Position = Vector3.new(0, 250, 150)
         p.Size = Vector3.new(2, 1, 2)
         print("Created part: " .. p.Name)
         print("Part Parent: " .. p.Parent.Name)
@@ -39,6 +40,8 @@ int main(int argc, char* argv[]) {
         -- Test signal connection
         p.Touched:Connect(function(other)
             print("Part touched by " .. other.Name)
+            if touched then return end
+            touched = true
 
             local explosion = Instance.new("Explosion")
             explosion.Position = p.Position
@@ -47,7 +50,7 @@ int main(int argc, char* argv[]) {
             print(p.Position, explosion.Position)
             explosion.Parent = workspace
         end)
-        print("Connected to Touched signal")
+
     )");
 
     engine.Run();

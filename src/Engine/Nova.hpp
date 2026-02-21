@@ -23,6 +23,9 @@
 #include "Engine/Objects/SpawnLocation.hpp"
 #include "Engine/Objects/Sky.hpp"
 #include "Engine/Objects/JointInstance.hpp"
+#include "Engine/Objects/Explosion.hpp"
+#include "Engine/Objects/Script.hpp"
+#include "Engine/Objects/LocalScript.hpp"
 
 // Services
 #include "Engine/Services/DataModel.hpp"

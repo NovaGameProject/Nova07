@@ -102,6 +102,9 @@ namespace Nova {
 
         void BreakJoints();
 
+        glm::vec3 GetVelocity();
+        void SetVelocity(const glm::vec3& velocity);
+
         void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
         void OnPropertyChanged(const std::string& name) override;
     };

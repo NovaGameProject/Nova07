@@ -30,6 +30,9 @@ namespace Nova {
         glm::vec4 topAmbient;
         glm::vec4 bottomAmbient;
         glm::vec4 lightDir;
+        glm::vec4 fogColor;
+        glm::vec4 fogParams; // x = start, y = end, z = enabled
+        glm::vec4 cameraPos;
     };
 
     class Renderer {

@@ -6,7 +6,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-#include "Engine/Reflection/InstanceFactory.hpp"
+#include "Engine/Objects/InstanceFactory.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
 #include "Common/MathTypes.hpp"
 #include "Engine/Services/PhysicsService.hpp"
@@ -136,7 +136,7 @@ namespace Nova {
 
         if (physics) {
             physics->SetDeferRegistration(false);
-            
+
             // Initialize physics interpolation state for all parts
             std::vector<std::shared_ptr<BasePart>> parts;
             FindAllBaseParts(dataModel, parts);

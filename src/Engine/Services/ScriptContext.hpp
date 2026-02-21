@@ -36,6 +36,7 @@ namespace Nova {
         void SetDataModel(std::shared_ptr<DataModel> dataModel);
 
         lua_State* GetLuaState() { return L; }
+        void ProcessScheduledTasks();
 
     private:
         void InitializeVM();
