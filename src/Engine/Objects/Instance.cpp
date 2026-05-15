@@ -39,8 +39,7 @@ namespace Nova {
 
     void Instance::SetParent(std::shared_ptr<Instance> newParent) {
         auto self = shared_from_this();
-        
-        // Find old workspace for refresh
+
         std::shared_ptr<Workspace> oldWS = nullptr;
         if (auto dm = GetDataModel()) oldWS = dm->GetService<Workspace>();
         bool wasInWS = oldWS && (this == oldWS.get() || IsDescendantOf(oldWS));
@@ -49,18 +48,16 @@ namespace Nova {
             auto& c = p->children;
             c.erase(std::remove(c.begin(), c.end(), self), c.end());
         }
-        
+
         parent = newParent;
         if (newParent) {
             newParent->children.push_back(self);
         }
-        
+
         OnAncestorChanged(self, newParent);
 
-        // Refresh old workspace cache
         if (wasInWS && oldWS) oldWS->RefreshCachedParts();
 
-        // Refresh new workspace cache
         if (newParent) {
             if (auto dm = newParent->GetDataModel()) {
                 if (auto newWS = dm->GetService<Workspace>()) {
@@ -82,64 +79,54 @@ namespace Nova {
         if (!key.isString()) return luabridge::LuaRef(L);
         std::string skey = key.unsafe_cast<std::string>();
 
-        // Explicitly handle Name and Parent first to ensure they work for all instances
+        // 1. Special cases
         if (skey == "Name") return luabridge::LuaRef(L, self.GetName());
         if (skey == "Parent") return luabridge::LuaRef(L, self.GetParent());
         if (skey == "ClassName") return luabridge::LuaRef(L, self.GetClassName());
 
-        // Helper: Velocity (for BasePart) - check early before property fallback
-        if (skey == "Velocity" || skey == "velocity") {
-            if (auto* basePart = dynamic_cast<BasePart*>(&self)) {
-                glm::vec3 vel = basePart->GetVelocity();
-                return luabridge::LuaRef(L, Vector3(vel.x, vel.y, vel.z));
+        // 2. Walk the ClassDescriptor chain
+        auto* desc = ClassDescriptor::Get(self.GetClassName());
+        while (desc) {
+            // Check properties
+            if (auto it = desc->properties.find(skey); it != desc->properties.end()) {
+                PropertyValue val = it->second->get(&self);
+                return propertyValueToLua(L, val);
             }
-        }
 
-        // 1. Try ClassDescriptor (Signals)
-        std::string currentClass = self.GetClassName();
-        while (!currentClass.empty()) {
-            auto desc = ClassDescriptor::Get(currentClass);
-            if (desc) {
-                if (desc->signals.contains(skey)) {
-                    Signal* sig = desc->signals[skey].getter(&self);
-                    return luabridge::LuaRef(L, sig);
-                }
+            // Check methods
+            if (auto it = desc->methods.find(skey); it != desc->methods.end()) {
+                // Create a callable function that captures the instance and method
+                auto methodCall = it->second.call;
+                return luabridge::LuaRef(L, [inst = &self, methodCall](lua_State* L) -> int {
+                    return methodCall(L, inst);
+                });
             }
-            if (desc) currentClass = desc->baseClassName;
-            else break;
-        }
 
-        // 2. Try generic property system
-        rfl::Generic prop = self.GetProperty(skey);
-        if (!std::holds_alternative<std::nullopt_t>(prop.variant())) {
-            return genericToLua(L, prop);
-        }
-
-        // 3. Helper: Position from CFrame (for BasePart)
-        if (skey == "Position") {
-            rfl::Generic cfGen = self.GetProperty("CFrame");
-            if (!std::holds_alternative<std::nullopt_t>(cfGen.variant())) {
-                auto cfResult = rfl::from_generic<CFrameReflect, rfl::UnderlyingEnums>(cfGen);
-                if (cfResult) {
-                    return luabridge::LuaRef(L, Vector3(cfResult->x, cfResult->y, cfResult->z));
-                }
+            // Check signals
+            if (auto it = desc->signals.find(skey); it != desc->signals.end()) {
+                Signal* sig = it->second.getter(&self);
+                return luabridge::LuaRef(L, sig);
             }
+
+            // Walk up inheritance
+            desc = desc->baseClass;
         }
 
-        // 4. Try children
+        // 3. Check children by name
         for (auto& child : self.children) {
             if (child->GetName() == skey) {
                 return luabridge::LuaRef(L, child);
             }
         }
 
-        return luabridge::LuaRef(L); // Returns nil
+        return luabridge::LuaRef(L);
     }
 
     luabridge::LuaRef Instance::LuaNewIndex(Instance& self, const luabridge::LuaRef& key, const luabridge::LuaRef& value, lua_State* L) {
         if (!key.isString()) return luabridge::LuaRef(L);
         std::string skey = key.unsafe_cast<std::string>();
 
+        // 1. Special case: Parent
         if (skey == "Parent") {
             if (value.isNil()) {
                 self.SetParent(nullptr);
@@ -156,50 +143,24 @@ namespace Nova {
             return luabridge::LuaRef(L);
         }
 
-        // Helper: Position (update CFrame translation)
-        if (skey == "Position") {
-            luabridge::push(L, value);
-            if (luabridge::Stack<Vector3>::isInstance(L, -1)) {
-                auto res = value.cast<Vector3>();
-                if (res) {
-                    Vector3 pos = res.value();
-                    rfl::Generic cfGen = self.GetProperty("CFrame");
-                    if (!std::holds_alternative<std::nullopt_t>(cfGen.variant())) {
-                        auto cfResult = rfl::from_generic<CFrameReflect, rfl::UnderlyingEnums>(cfGen);
-                        if (cfResult) {
-                            CFrameReflect newCf = cfResult.value();
-                            newCf.x = pos.x; newCf.y = pos.y; newCf.z = pos.z;
-                            self.SetProperty("CFrame", rfl::to_generic<rfl::UnderlyingEnums>(newCf));
-                        }
-                    }
-                }
-            }
-            lua_pop(L, 1);
-            return luabridge::LuaRef(L);
-        }
+        // 2. Convert value to PropertyValue
+        PropertyValue propVal = luaToPropertyValue(value);
 
-        // Helper: Velocity (for BasePart)
-        if (skey == "Velocity" || skey == "velocity") {
-            if (auto* basePart = dynamic_cast<BasePart*>(&self)) {
-                luabridge::push(L, value);
-                if (luabridge::Stack<Vector3>::isInstance(L, -1)) {
-                    auto res = value.cast<Vector3>();
-                    if (res) {
-                        Vector3 vel = res.value();
-                        basePart->SetVelocity(glm::vec3(vel.x, vel.y, vel.z));
-                    }
+        // 3. Walk the ClassDescriptor chain to find and set the property
+        auto* desc = ClassDescriptor::Get(self.GetClassName());
+        while (desc) {
+            if (auto it = desc->properties.find(skey); it != desc->properties.end()) {
+                if (it->second->set(&self, propVal)) {
+                    self.OnPropertyChanged(skey);
+                } else {
+                    std::cerr << "Failed to set property " << skey << " on " << self.GetClassName() << std::endl;
                 }
-                lua_pop(L, 1);
                 return luabridge::LuaRef(L);
             }
+            desc = desc->baseClass;
         }
 
-        rfl::Generic g = luaToGeneric(value);
-        if (self.SetProperty(skey, g)) {
-            return luabridge::LuaRef(L);
-        }
-
-        std::cerr << "Failed to set property " << skey << " on " << self.GetClassName() << std::endl;
+        std::cerr << "Unknown property " << skey << " on " << self.GetClassName() << std::endl;
         return luabridge::LuaRef(L);
     }
 
@@ -282,42 +243,44 @@ namespace Nova {
     }
 
     bool Instance::IsA(const std::string& className) {
-        std::string currentClass = GetClassName();
-        while (!currentClass.empty()) {
-            if (currentClass == className) return true;
-            auto desc = ClassDescriptor::Get(currentClass);
-            if (desc) currentClass = desc->baseClassName;
-            else break;
-        }
-        return false;
+        auto* desc = ClassDescriptor::Get(GetClassName());
+        if (desc) return desc->IsA(className);
+        return GetClassName() == className;
     }
 
     std::shared_ptr<Instance> Instance::Clone() {
         auto inst = InstanceFactory::Get().Create(GetClassName());
         if (!inst) return nullptr;
-        
-        inst->ApplyPropertiesGeneric(GetPropertiesGeneric());
-        
+
+        // Copy properties via ClassDescriptor
+        auto* desc = ClassDescriptor::Get(GetClassName());
+        if (desc) {
+            for (auto& [name, accessor] : desc->properties) {
+                PropertyValue val = accessor->get(this);
+                accessor->set(inst.get(), val);
+            }
+        }
+
         for (auto& child : children) {
             auto childClone = child->Clone();
             if (childClone) {
                 childClone->SetParent(inst);
             }
         }
-        
+
         return inst;
     }
 
     void Instance::Destroy() {
         if (m_destroyed) return;
         m_destroyed = true;
-        
+
         auto childrenCopy = children;
         for (auto& child : childrenCopy) {
             child->Destroy();
         }
         children.clear();
-        
+
         SetParent(nullptr);
     }
 }

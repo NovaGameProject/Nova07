@@ -12,33 +12,27 @@
 #include "Common/MathTypes.hpp"
 
 namespace Nova {
-    namespace Props {
-        struct ExplosionProps {
-            rfl::Flatten<InstanceProps> base;
-            rfl::Rename<"Position", Vector3Reflect> Position;
-            float BlastRadius = 4.0f;
-            float BlastPressure = 500000.0f;
-        };
-    }
-
     class Explosion : public Instance {
     public:
-        Props::ExplosionProps props;
-        NOVA_OBJECT(Explosion, props)
-        
-        Signal Hit; // Fires for each affected part
-        
-        // Visual effect state
+        Vector3 position;
+        float BlastRadius = 4.0f;
+        float BlastPressure = 500000.0f;
+
+        Signal Hit;
+
         bool m_visualActive = false;
         float m_visualTime = 0.0f;
         float m_visualDuration = 0.5f;
-        
+
         void UpdateVisual(float dt);
         bool IsVisualActive() const { return m_visualActive; }
         float GetVisualProgress() const { return m_visualActive ? (m_visualTime / m_visualDuration) : 0.0f; }
-        
+
         Explosion();
 
         void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
+
+        std::string GetClassName() const override { return "Explosion"; }
+        std::string GetName() const override { return m_debugName; }
     };
 }

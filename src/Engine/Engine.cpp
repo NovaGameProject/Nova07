@@ -54,10 +54,10 @@ namespace Nova {
 
     void Engine::SetupDefaultLighting() {
         auto lighting = dataModel->GetService<Lighting>();
-        if (lighting->props.ClearColor.r == 0.0f || (lighting->props.ClearColor.r == 1.0f && lighting->props.ClearColor.g == 1.0f)) {
-            lighting->props.ClearColor = { 132/255.0f, 177/255.0f, 248/255.0f };
-            lighting->props.TopAmbientV9 = { 0.5f, 0.5f, 0.5f };
-            lighting->props.BottomAmbientV9 = { 0.2f, 0.2f, 0.2f };
+        if (lighting->ClearColor.r == 0.0f || (lighting->ClearColor.r == 1.0f && lighting->ClearColor.g == 1.0f)) {
+            lighting->ClearColor = { 132/255.0f, 177/255.0f, 248/255.0f };
+            lighting->TopAmbientV9 = { 0.5f, 0.5f, 0.5f };
+            lighting->BottomAmbientV9 = { 0.2f, 0.2f, 0.2f };
         }
 
         // Add default Sky if none exists
@@ -96,7 +96,7 @@ namespace Nova {
                     const bool* keys = SDL_GetKeyboardState(NULL);
                     float speed = 100.0f * (float)dt;
                     float sensitivity = 0.002f;
-                    auto novaCF = camera->props.CFrame.to_nova();
+                    auto novaCF = camera->cframe;
                     float dx = window->mouseDeltaX;
                     float dy = window->mouseDeltaY;
                     glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), -dx * sensitivity, glm::vec3(0, 1, 0));
@@ -110,7 +110,7 @@ namespace Nova {
                     if (keys[SDL_SCANCODE_D]) novaCF.position += right * speed;
                     if (keys[SDL_SCANCODE_E]) novaCF.position.y += speed;
                     if (keys[SDL_SCANCODE_Q]) novaCF.position.y -= speed;
-                    camera->props.CFrame = CFrameReflect::from_nova(novaCF);
+                    camera->cframe = novaCF;
                 }
             },
             .priority = 10,

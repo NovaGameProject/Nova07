@@ -10,21 +10,12 @@
 #include "Engine/Objects/Instance.hpp"
 
 namespace Nova {
-
-    namespace Props {
-        struct ModelProps {
-            rfl::Flatten<InstanceProps> base;
-        };
-    }
-
     class Model : public Instance {
     public:
-        Props::ModelProps props;
-        NOVA_OBJECT(Model, props)
+        std::weak_ptr<Instance> PrimaryPart;
 
         Model() : Instance("Model") {}
-
-        std::weak_ptr<Instance> PrimaryPart;
+        std::string GetClassName() const override { return "Model"; }
+        std::string GetName() const override { return m_debugName; }
     };
-
 }

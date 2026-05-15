@@ -17,7 +17,7 @@ namespace Nova {
     void Script::OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) {
         Instance::OnAncestorChanged(instance, newParent);
 
-        if (m_hasRun || props.Disabled) return;
+        if (m_hasRun || Disabled) return;
 
         auto dm = GetDataModel();
         if (dm) {
@@ -41,7 +41,7 @@ namespace Nova {
 
         luabridge::setGlobal(L, std::static_pointer_cast<Script>(shared_from_this()), "script");
 
-        scriptContext->Execute(props.Source, GetName());
+        scriptContext->Execute(Source, GetName());
 
         m_hasRun = true;
     }

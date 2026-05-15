@@ -10,20 +10,12 @@
 #include "Engine/Objects/Script.hpp"
 
 namespace Nova {
-    namespace Props {
-        struct LocalScriptProps {
-            rfl::Flatten<ScriptProps> base;
-        };
-    }
-
     class LocalScript : public Script {
     public:
-        Props::LocalScriptProps props;
-        NOVA_OBJECT(LocalScript, props)
-
         LocalScript() : Script("LocalScript") {}
         ~LocalScript() override = default;
 
         void Run() override;
+        std::string GetClassName() const override { return "LocalScript"; }
     };
 }

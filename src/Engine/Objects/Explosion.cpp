@@ -25,15 +25,13 @@ namespace Nova {
             auto workspace = dm->GetService<Workspace>();
             if (IsDescendantOf(workspace)) {
                 if (auto physics = dm->GetService<PhysicsService>()) {
-                    glm::vec3 pos = props.Position.get().to_glm();
-                    float radius = props.BlastRadius;
-                    
-                    std::cout << "[Explosion] Queuing explosion at (" << pos.x << ", " << pos.y << ", " << pos.z 
+                    glm::vec3 pos = position;
+                    float radius = BlastRadius;
+
+                    std::cout << "[Explosion] Queuing explosion at (" << pos.x << ", " << pos.y << ", " << pos.z
                               << ") with radius " << radius << std::endl;
-                    
-                    // Queue the explosion for processing on the physics thread
-                    // This prevents race conditions with the physics simulation
-                    physics->QueueExplosion(pos, radius, props.BlastPressure);
+
+                    physics->QueueExplosion(pos, radius, BlastPressure);
                     
                     // Start visual effect
                     m_visualActive = true;

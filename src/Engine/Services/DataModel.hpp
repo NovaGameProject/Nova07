@@ -13,7 +13,8 @@ namespace Nova {
     class DataModel : public Instance {
     public:
         DataModel() : Instance("Game") {}
-        NOVA_OBJECT_NO_PROPS(DataModel)
+        std::string GetClassName() const override { return "DataModel"; }
+        std::string GetName() const override { return m_debugName; }
 
         template<typename T>
         std::shared_ptr<T> GetService() {

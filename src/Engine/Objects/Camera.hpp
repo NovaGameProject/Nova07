@@ -7,35 +7,25 @@
 // (at your option) any later version.
 
 #pragma once
-#include <rfl/Flatten.hpp>
-#include <rfl/Rename.hpp>
 #include "Engine/Enums/Enums.hpp"
 #include "Engine/Objects/Instance.hpp"
 #include "Common/MathTypes.hpp"
 
 namespace Nova {
-    namespace Props {
-        struct CameraProps {
-            rfl::Flatten<InstanceProps> base;
-            CFrameReflect CFrame;
-            CFrameReflect Focus;
-            rfl::Rename<"CameraType", enum CameraType> CameraType = CameraType::Fixed;
-            // float FieldOfView = 70.0f;
-
-        };
-    }
-
     class Camera : public Instance {
     public:
-        Props::CameraProps props;
+        CFrame cframe;
+        CFrame focus;
+        CameraType cameraType = CameraType::Fixed;
+        float fieldOfView = 70.0f;
 
         Camera() : Instance("Camera") {}
 
         glm::mat4 GetViewMatrix() {
-            // The View matrix is the inverse of the Camera's World CFrame
-            return glm::inverse(props.CFrame.to_nova().to_mat4());
+            return glm::inverse(cframe.to_mat4());
         }
 
-        NOVA_OBJECT(Camera, props)
+        std::string GetClassName() const override { return "Camera"; }
+        std::string GetName() const override { return m_debugName; }
     };
 }

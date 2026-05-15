@@ -36,7 +36,7 @@ namespace Nova {
                         auto itRel = assembly->relativeTransforms.find(p.get());
                         if (itRel == assembly->relativeTransforms.end()) continue;
 
-                        CFrame worldCF = assembly->rootPart->basePartProps->CFrame.get().to_nova() * itRel->second;
+                        CFrame worldCF = assembly->rootPart->cframe * itRel->second;
                         float distance = glm::length(worldCF.position - exp.position);
                         if (distance <= exp.radius) {
                             affectedParts.insert(p.get());
@@ -65,7 +65,7 @@ namespace Nova {
                 auto itRel = itAss->second->relativeTransforms.find(p);
                 if (itRel == itAss->second->relativeTransforms.end()) continue;
 
-                CFrame worldCF = itAss->second->rootPart->basePartProps->CFrame.get().to_nova() * itRel->second;
+                CFrame worldCF = itAss->second->rootPart->cframe * itRel->second;
                 bi.AddImpulse(p->physicsBodyID, JPH::Vec3(impulse.x, impulse.y, impulse.z), 
                     JPH::RVec3(worldCF.position.x, worldCF.position.y, worldCF.position.z));
                 
@@ -96,7 +96,7 @@ namespace Nova {
                 auto itRel = assembly->relativeTransforms.find(p.get());
                 if (itRel == assembly->relativeTransforms.end()) continue;
 
-                CFrame worldCF = assembly->rootPart->basePartProps->CFrame.get().to_nova() * itRel->second;
+                CFrame worldCF = assembly->rootPart->cframe * itRel->second;
                 float distance = glm::length(worldCF.position - position);
                 
                 if (distance <= radius) {

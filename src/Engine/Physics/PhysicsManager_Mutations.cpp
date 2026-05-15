@@ -147,8 +147,8 @@ namespace Nova {
                     if (joint->GetClassName() == "Motor") {
                         JPH::HingeConstraintSettings settings;
                         settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
-                        auto cf0_part = static_cast<Motor*>(joint.get())->props.base.get().C0.get().to_nova();
-                        auto cf1_part = static_cast<Motor*>(joint.get())->props.base.get().C1.get().to_nova();
+                        auto cf0_part = static_cast<Motor*>(joint.get())->c0;
+                        auto cf1_part = static_cast<Motor*>(joint.get())->c1;
                         CFrame cf0 = rel0 * cf0_part;
                         CFrame cf1 = rel1 * cf1_part;
                         settings.mPoint1 = JPH::RVec3(cf0.position.x, cf0.position.y, cf0.position.z);
@@ -162,8 +162,8 @@ namespace Nova {
                     else if (joint->GetClassName() == "Hinge") {
                         JPH::HingeConstraintSettings settings;
                         settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
-                        auto cf0_part = static_cast<Hinge*>(joint.get())->props.base.get().C0.get().to_nova();
-                        auto cf1_part = static_cast<Hinge*>(joint.get())->props.base.get().C1.get().to_nova();
+                        auto cf0_part = static_cast<Hinge*>(joint.get())->c0;
+                        auto cf1_part = static_cast<Hinge*>(joint.get())->c1;
                         CFrame cf0 = rel0 * cf0_part;
                         CFrame cf1 = rel1 * cf1_part;
                         settings.mPoint1 = JPH::RVec3(cf0.position.x, cf0.position.y, cf0.position.z);
@@ -177,8 +177,8 @@ namespace Nova {
                     else if (joint->GetClassName() == "VelocityMotor") {
                         JPH::HingeConstraintSettings settings;
                         settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
-                        auto cf0_part = static_cast<VelocityMotor*>(joint.get())->props.base.get().C0.get().to_nova();
-                        auto cf1_part = static_cast<VelocityMotor*>(joint.get())->props.base.get().C1.get().to_nova();
+                        auto cf0_part = static_cast<VelocityMotor*>(joint.get())->c0;
+                        auto cf1_part = static_cast<VelocityMotor*>(joint.get())->c1;
                         CFrame cf0 = rel0 * cf0_part;
                         CFrame cf1 = rel1 * cf1_part;
                         settings.mPoint1 = JPH::RVec3(cf0.position.x, cf0.position.y, cf0.position.z);
@@ -191,7 +191,7 @@ namespace Nova {
                         if (c) {
                             auto* h = static_cast<JPH::HingeConstraint*>(c);
                             h->SetMotorState(JPH::EMotorState::Velocity);
-                            h->SetTargetAngularVelocity(static_cast<VelocityMotor*>(joint.get())->props.MaxVelocity);
+                            h->SetTargetAngularVelocity(static_cast<VelocityMotor*>(joint.get())->MaxVelocity);
                         }
                     }
 

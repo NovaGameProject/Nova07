@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <rfl.hpp>
-
 namespace Nova {
     enum class PartType {
         Ball = 0,

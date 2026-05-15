@@ -105,7 +105,7 @@ namespace Nova {
     ) {
         glm::vec3 cameraPos(0, 0, 0);
         if (workspace->CurrentCamera) {
-            cameraPos = workspace->CurrentCamera->props.CFrame.to_nova().position;
+            cameraPos = workspace->CurrentCamera->cframe.position;
         }
 
         for (auto& physical : workspace->cachedParts) {
@@ -116,16 +116,15 @@ namespace Nova {
 
             if (frustum.IntersectsSphere(worldPos, radius)) {
                 glm::mat4 scaledMatrix = glm::scale(worldMatrix, size);
-                auto& bp = physical->basePartProps;
                 InstanceData data = {
                     viewProj * scaledMatrix,
                     scaledMatrix,
                     physical->GetColor(),
                     glm::vec4(size, 1.0f),
                     {
-                        (int32_t)bp->FrontSurface, (int32_t)bp->BackSurface,
-                        (int32_t)bp->LeftSurface, (int32_t)bp->RightSurface,
-                        (int32_t)bp->TopSurface, (int32_t)bp->BottomSurface,
+                        (int32_t)physical->frontSurface, (int32_t)physical->backSurface,
+                        (int32_t)physical->leftSurface, (int32_t)physical->rightSurface,
+                        (int32_t)physical->topSurface, (int32_t)physical->bottomSurface,
                         0, 0 // Padding
                     }
                 };
@@ -150,7 +149,7 @@ namespace Nova {
             glm::vec3 cameraPos(50, 50, 50);
             if (workspace->CurrentCamera) {
                 view = workspace->CurrentCamera->GetViewMatrix();
-                cameraPos = workspace->CurrentCamera->props.CFrame.to_nova().position;
+                cameraPos = workspace->CurrentCamera->cframe.position;
             } else {
                 view = glm::lookAtRH(cameraPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
             }
@@ -173,10 +172,10 @@ namespace Nova {
             lData.cameraPos = glm::vec4(cameraPos, 1.0f);
 
             if (lighting) {
-                lData.topAmbient = glm::vec4(lighting->props.TopAmbientV9.to_glm(), 1.0f);
-                lData.bottomAmbient = glm::vec4(lighting->props.BottomAmbientV9.to_glm(), 1.0f);
+                lData.topAmbient = glm::vec4(lighting->TopAmbientV9, 1.0f);
+                lData.bottomAmbient = glm::vec4(lighting->BottomAmbientV9, 1.0f);
                 lData.lightDir = glm::vec4(glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)), 1.0f);
-                lData.fogColor = glm::vec4(lighting->props.ClearColor.r, lighting->props.ClearColor.g, lighting->props.ClearColor.b, 1.0f);
+                lData.fogColor = glm::vec4(lighting->ClearColor.r, lighting->ClearColor.g, lighting->ClearColor.b, 1.0f);
                 lData.fogParams = glm::vec4(0.0f, 500.0f, 1.0f, 0.0f);
             } else {
                 lData.topAmbient = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
@@ -222,7 +221,7 @@ namespace Nova {
             colorTarget.texture = swapchainTexture;
             colorTarget.clear_color = { 0.1f, 0.1f, 0.2f, 1.0f };
             if (lighting) {
-                auto& cc = lighting->props.ClearColor;
+                auto& cc = lighting->ClearColor;
                 colorTarget.clear_color = { cc.r, cc.g, cc.b, 1.0f };
             }
             colorTarget.load_op = SDL_GPU_LOADOP_CLEAR;

@@ -58,7 +58,8 @@ namespace Nova {
         PhysicsService();
         ~PhysicsService();
 
-        NOVA_OBJECT_NO_PROPS(PhysicsService)
+        std::string GetClassName() const override { return "PhysicsService"; }
+        std::string GetName() const override { return m_debugName; }
 
         // Async Physics Management
         void Start();

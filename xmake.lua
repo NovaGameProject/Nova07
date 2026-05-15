@@ -2,25 +2,25 @@ set_project("Nova07")
 set_version("0.1.0")
 
 add_rules("mode.debug", "mode.release")
+add_rules("plugin.compile_commands.autoupdate", { outputdir = "build" })
 
 set_languages("c++20")
 
 -- Dependencies
-add_requires("libsdl3", {configs = {vulkan = true}})
-add_requires("libsdl3_image", {configs = {jpeg = true, png = true, tiff = true, webp = true}})
+add_requires("libsdl3", { configs = { vulkan = true } })
+add_requires("libsdl3_image", { configs = { jpeg = true, png = true, tiff = true, webp = true } })
 add_requires("shaderc")
-add_requires("reflect-cpp")
 add_requires("luau")
 add_requires("luabridge3")
 add_requires("glm")
 add_requires("joltphysics")
 add_requires("pugixml")
-add_requires("tracy v0.12.2", {configs = {on_demand = true}})
+add_requires("tracy v0.12.2", { configs = { on_demand = true } })
 
 -- Shader compilation rule using glslc (from shaderc)
 rule("hlsl2spv")
     set_extensions(".hlsl")
-    on_buildcmd_file(function(target, batchcmds, sourcefile, opt)
+    on_buildcmd_file( function (target, batchcmds, sourcefile, opt)
         import("lib.detect.find_tool")
 
         local glslc = find_tool("glslc")
@@ -71,7 +71,6 @@ target("Nova07")
         "libsdl3",
         "libsdl3_image",
         "shaderc",
-        "reflect-cpp",
         "luau",
         "luabridge3",
         "glm",

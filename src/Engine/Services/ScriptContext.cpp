@@ -67,19 +67,18 @@ namespace Nova {
     static int lua_wait(lua_State* L) {
         double seconds = luaL_optnumber(L, 1, 0.0);
         if (seconds < 0) seconds = 0;
-        
+
         double wakeTime = GetGameTime() + seconds;
-        
-        // Push current thread onto stack and create LuaRef from it
+
         lua_pushthread(L);
         luabridge::LuaRef coro = luabridge::LuaRef::fromStack(L, -1);
         lua_pop(L, 1);
-        
+
         ScheduledTask task(L);
         task.wakeTime = wakeTime;
         task.coroutine = coro;
         g_taskQueue.push(task);
-        
+
         return lua_yield(L, 0);
     }
 
@@ -156,6 +155,7 @@ namespace Nova {
     }
 
     void ScriptContext::BindAPI() {
+        // Signal and Connection types
         luabridge::getGlobalNamespace(L)
             .beginClass<Signal>("Signal")
                 .addFunction("connect", &Signal::connect)
@@ -168,6 +168,7 @@ namespace Nova {
                 .addFunction("Disconnect", &Signal::LuaConnection::Disconnect)
             .endClass();
 
+        // Math types
         luabridge::getGlobalNamespace(L)
             .beginClass<Vector3>("Vector3")
                 .addConstructor<void(*)(float, float, float)>()
@@ -188,6 +189,7 @@ namespace Nova {
                 .addProperty("Position", &CFrame::position)
             .endClass();
 
+        // Instance class — LuaIndex/LuaNewIndex handle all property/method access
         luabridge::getGlobalNamespace(L)
             .beginClass<Instance>("Instance")
                 .addStaticFunction("new", +[](std::string className, luabridge::LuaRef parent) -> std::shared_ptr<Instance> {
@@ -233,6 +235,8 @@ namespace Nova {
                 .addNewIndexMetaMethod(Instance::LuaNewIndex)
             .endClass();
 
+        // Class hierarchy — just declarations, no duplicate bindings
+        // Properties and methods are handled by ClassDescriptor through LuaIndex
         luabridge::getGlobalNamespace(L)
             .deriveClass<DataModel, Instance>("DataModel")
                 .addFunction("GetService", static_cast<std::shared_ptr<Instance>(DataModel::*)(const std::string&)>(&DataModel::GetService))
@@ -241,27 +245,22 @@ namespace Nova {
 
         luabridge::getGlobalNamespace(L).deriveClass<Workspace, Instance>("Workspace").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Lighting, Instance>("Lighting").endClass();
-        luabridge::getGlobalNamespace(L)
-            .deriveClass<BasePart, Instance>("BasePart")
-                .addFunction("BreakJoints", &BasePart::BreakJoints)
-                .addFunction("GetVelocity", &BasePart::GetVelocity)
-                .addFunction("SetVelocity", &BasePart::SetVelocity)
-            .endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<BasePart, Instance>("BasePart").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Part, BasePart>("Part").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Seat, Part>("Seat").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<SpawnLocation, Part>("SpawnLocation").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Model, Instance>("Model").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Camera, Instance>("Camera").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Sky, Instance>("Sky").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<SpecialMesh, Instance>("SpecialMesh").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<JointInstance, Instance>("JointInstance").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<AutoJoint, JointInstance>("AutoJoint").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Weld, JointInstance>("Weld").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Snap, JointInstance>("Snap").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Glue, JointInstance>("Glue").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Motor, JointInstance>("Motor").endClass();
-        luabridge::getGlobalNamespace(L).deriveClass<Hinge, JointInstance>("Hinge")
-            .addFunction("GetCurrentAngle", &Hinge::GetCurrentAngle)
-        .endClass();
-        luabridge::getGlobalNamespace(L).deriveClass<VelocityMotor, JointInstance>("VelocityMotor")
-            .addFunction("GetCurrentAngle", &VelocityMotor::GetCurrentAngle)
-            .addFunction("SetTargetVelocity", &VelocityMotor::SetTargetVelocity)
-        .endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Hinge, JointInstance>("Hinge").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<VelocityMotor, JointInstance>("VelocityMotor").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Script, Instance>("Script").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<LocalScript, Script>("LocalScript").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Explosion, Instance>("Explosion").endClass();
@@ -277,11 +276,10 @@ namespace Nova {
             if (task.isDelay && !task.callback.isNil()) {
                 task.callback();
             } else if (!task.coroutine.isNil()) {
-                // Push the thread onto the stack and get its state
                 task.coroutine.push();
                 lua_State* co = lua_tothread(L, -1);
                 lua_pop(L, 1);
-                
+
                 if (co) {
                     int status = lua_resume(co, L, 0);
                     if (status != LUA_OK && status != LUA_YIELD) {

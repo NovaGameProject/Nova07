@@ -30,7 +30,8 @@ namespace Nova {
         ScriptContext();
         ~ScriptContext();
 
-        NOVA_OBJECT_NO_PROPS(ScriptContext)
+        std::string GetClassName() const override { return "ScriptContext"; }
+        std::string GetName() const override { return m_debugName; }
 
         void Execute(const std::string& source, const std::string& chunkName = "script");
         void SetDataModel(std::shared_ptr<DataModel> dataModel);

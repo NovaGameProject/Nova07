@@ -11,24 +11,18 @@
 #include <string>
 
 namespace Nova {
-    namespace Props {
-        struct ScriptProps {
-            rfl::Flatten<InstanceProps> base;
-            std::string Source;
-            bool Disabled = false;
-        };
-    }
-
     class Script : public Instance {
     public:
-        Props::ScriptProps props;
-        NOVA_OBJECT(Script, props)
+        std::string Source;
+        bool Disabled = false;
 
         Script(std::string name = "Script");
 
         void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
-
         virtual void Run();
+
+        std::string GetClassName() const override { return "Script"; }
+        std::string GetName() const override { return m_debugName; }
 
     private:
         bool m_hasRun = false;

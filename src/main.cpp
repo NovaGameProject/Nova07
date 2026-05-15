@@ -45,8 +45,8 @@ int main(int argc, char* argv[]) {
 
             local explosion = Instance.new("Explosion")
             explosion.Position = p.Position
-            explosion.BlastRadius = 10000
-            explosion.BlastPressure = 100000000
+            explosion.BlastRadius = 100
+            explosion.BlastPressure = 10000
             print(p.Position, explosion.Position)
             explosion.Parent = workspace
         end)

@@ -12,7 +12,6 @@
 #include "Engine/Objects/Instance.hpp"
 #include "Common/BrickColors.hpp"
 #include "Engine/Common/Signal.hpp"
-#include <rfl/Flatten.hpp>
 #include <optional>
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
@@ -20,83 +19,67 @@
 namespace Nova {
     class PhysicsService;
 
-    namespace Props {
-        struct BasePartProps {
-            rfl::Flatten<Props::InstanceProps> base;
-            
-            rfl::Rename<"CFrame", CFrameReflect> CFrame;
-            rfl::Rename<"Size", Vector3Reflect> Size = Vector3Reflect{4.0f, 1.2f, 2.0f};
-            
-            bool Anchored = false;
-            bool CanCollide = true;
-            
-            std::optional<Color3Reflect> Color;
-            float Transparency = 0.0f;
-            int BrickColor = 194; // Medium Stone Grey
-
-            SurfaceType TopSurface = SurfaceType::Studs;
-            SurfaceType BottomSurface = SurfaceType::Inlets;
-            SurfaceType LeftSurface = SurfaceType::Smooth;
-            SurfaceType RightSurface = SurfaceType::Smooth;
-            SurfaceType FrontSurface = SurfaceType::Smooth;
-            SurfaceType BackSurface = SurfaceType::Smooth;
-        };
-    }
-
     class BasePart : public Instance {
     public:
-        Signal Touched;
-        virtual ~BasePart();
+        // Properties — direct members, no rfl::Flatten, no Props:: namespace
+        CFrame cframe;
+        Vector3 size = {4.0f, 1.2f, 2.0f};
+        bool anchored = false;
+        bool canCollide = true;
+        std::optional<Color3> color;
+        float transparency = 0.0f;
+        int brickColor = 194; // Medium Stone Grey
 
-        // Direct pointer to props for high-performance access in the renderer
-        Props::BasePartProps* basePartProps = nullptr;
+        SurfaceType topSurface = SurfaceType::Studs;
+        SurfaceType bottomSurface = SurfaceType::Inlets;
+        SurfaceType leftSurface = SurfaceType::Smooth;
+        SurfaceType rightSurface = SurfaceType::Smooth;
+        SurfaceType frontSurface = SurfaceType::Smooth;
+        SurfaceType backSurface = SurfaceType::Smooth;
+
+        // Signal
+        Signal Touched;
 
         // Jolt Physics linkage
         JPH::BodyID physicsBodyID;
         std::weak_ptr<PhysicsService> registeredService;
 
-        void InitializePhysics();
+        virtual ~BasePart();
 
         BasePart(std::string name) : Instance(name) {}
+        BasePart() : Instance("BasePart") {}
+
+        void InitializePhysics();
 
         virtual glm::mat4 GetLocalTransform() {
-            if (basePartProps) return basePartProps->CFrame.get().to_nova().to_mat4();
-            return glm::mat4(1.0f);
+            return cframe.to_mat4();
         }
 
         virtual glm::mat3 GetRotation() {
-            if (basePartProps) return basePartProps->CFrame.get().to_nova().rotation;
-            return glm::mat3(1.0f);
+            return cframe.rotation;
         }
 
         virtual glm::vec3 GetSize() {
-            if (basePartProps) return basePartProps->Size.get().to_glm();
-            return glm::vec3(1.0f);
+            return size;
         }
 
         virtual glm::vec4 GetColor() {
-            if (!basePartProps) return glm::vec4(1.0f);
-
             glm::vec3 rgb;
-            if (basePartProps->Color.has_value()) {
-                rgb = basePartProps->Color->to_glm();
+            if (color.has_value()) {
+                rgb = *color;
             } else {
-                rgb = BrickColorUtils::ToColor3(basePartProps->BrickColor);
+                rgb = BrickColorUtils::ToColor3(brickColor);
             }
-            return glm::vec4(rgb, 1.0f - basePartProps->Transparency);
+            return glm::vec4(rgb, 1.0f - transparency);
         }
 
         SurfaceType GetSurfaceType(glm::vec3 localNormal) {
-            if (!basePartProps) return SurfaceType::Smooth;
-            
-            // Map normal to face
-            if (localNormal.y > 0.8f) return basePartProps->TopSurface;
-            if (localNormal.y < -0.8f) return basePartProps->BottomSurface;
-            if (localNormal.x > 0.8f) return basePartProps->RightSurface;
-            if (localNormal.x < -0.8f) return basePartProps->LeftSurface;
-            if (localNormal.z > 0.8f) return basePartProps->BackSurface;
-            if (localNormal.z < -0.8f) return basePartProps->FrontSurface;
-            
+            if (localNormal.y > 0.8f) return topSurface;
+            if (localNormal.y < -0.8f) return bottomSurface;
+            if (localNormal.x > 0.8f) return rightSurface;
+            if (localNormal.x < -0.8f) return leftSurface;
+            if (localNormal.z > 0.8f) return backSurface;
+            if (localNormal.z < -0.8f) return frontSurface;
             return SurfaceType::Smooth;
         }
 
@@ -107,5 +90,8 @@ namespace Nova {
 
         void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
         void OnPropertyChanged(const std::string& name) override;
+
+        std::string GetClassName() const override { return "BasePart"; }
+        std::string GetName() const override { return m_debugName; }
     };
 }

@@ -7,27 +7,12 @@
 // (at your option) any later version.
 
 #pragma once
-#include <rfl/Flatten.hpp>
-#include "Engine/Enums/Enums.hpp"
 #include "Engine/Objects/Part.hpp"
 
 namespace Nova {
-
-    namespace Props {
-        struct SeatPartProps {
-            rfl::Flatten<PartProps> base;
-        };
-    }
-
-
     class Seat : public Part {
     public:
-        Props::SeatPartProps props;
-        Seat() : Part("Seat") {
-            basePartProps = &props.base.get().base.get();
-        }
-
-        NOVA_OBJECT(Seat, props)
+        Seat() : Part("Seat") {}
+        std::string GetClassName() const override { return "Seat"; }
     };
-
 }

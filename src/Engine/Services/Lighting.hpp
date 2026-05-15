@@ -11,23 +11,17 @@
 #include "Engine/Objects/Instance.hpp"
 
 namespace Nova {
-
-    namespace Props {
-        struct LightingProps {
-            rfl::Flatten<InstanceProps> base;
-            Color3Reflect TopAmbientV9 = {0.5f, 0.5f, 0.5f};
-            Color3Reflect BottomAmbientV9 = {0.2f, 0.2f, 0.2f};
-            Color3Reflect SpotLightV9 = {1.0f, 1.0f, 1.0f};
-            Color3Reflect ClearColor = {0.517647f, 0.694118f, 0.972549f};
-            float GeographicLatitude = 41.7333f;
-            std::string TimeOfDay = "14:00:00";
-        };
-    }
-
     class Lighting : public Instance {
     public:
-        Props::LightingProps props;
-        NOVA_OBJECT(Lighting, props)
+        Color3 TopAmbientV9 = {0.5f, 0.5f, 0.5f};
+        Color3 BottomAmbientV9 = {0.2f, 0.2f, 0.2f};
+        Color3 SpotLightV9 = {1.0f, 1.0f, 1.0f};
+        Color3 ClearColor = {0.517647f, 0.694118f, 0.972549f};
+        float GeographicLatitude = 41.7333f;
+        std::string TimeOfDay = "14:00:00";
+
         Lighting() : Instance("Lighting") {}
+        std::string GetClassName() const override { return "Lighting"; }
+        std::string GetName() const override { return m_debugName; }
     };
 }

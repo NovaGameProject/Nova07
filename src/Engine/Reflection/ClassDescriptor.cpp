@@ -10,13 +10,26 @@
 
 namespace Nova {
     std::map<std::string, std::shared_ptr<ClassDescriptor>>& ClassDescriptor::GetAll() {
-        static std::map<std::string, std::shared_ptr<ClassDescriptor>> all;
-        return all;
+        static std::map<std::string, std::shared_ptr<ClassDescriptor>> registry;
+        return registry;
     }
 
-    std::shared_ptr<ClassDescriptor> ClassDescriptor::Get(const std::string& name) {
+    ClassDescriptor* ClassDescriptor::Get(const std::string& name) {
         auto& all = GetAll();
-        if (all.contains(name)) return all[name];
+        auto it = all.find(name);
+        if (it != all.end()) return it->second.get();
         return nullptr;
+    }
+
+    void ClassDescriptor::ResolveInheritance() {
+        auto& all = GetAll();
+        for (auto& [name, desc] : all) {
+            if (!desc->baseClassName.empty()) {
+                auto it = all.find(desc->baseClassName);
+                if (it != all.end()) {
+                    desc->baseClass = it->second.get();
+                }
+            }
+        }
     }
 }

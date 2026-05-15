@@ -13,29 +13,20 @@
 #include <memory>
 
 namespace Nova {
-
     class BasePart;
-
-    namespace Props {
-        struct WorkspaceProps {
-            rfl::Flatten<InstanceProps> base;
-            float FallenPartsDestroyHeight = -500.0f;
-        };
-    }
 
     class Workspace : public Instance {
     public:
-        Props::WorkspaceProps props;
-        NOVA_OBJECT(Workspace, props)
+        float FallenPartsDestroyHeight = -500.0f;
+
+        std::shared_ptr<Camera> CurrentCamera;
+        std::vector<std::shared_ptr<BasePart>> cachedParts;
 
         Workspace() : Instance("Workspace") {}
 
-        std::shared_ptr<Camera> CurrentCamera;
-
-        // Optimization: Flattened list of physical parts for the renderer/physics sync
-        std::vector<std::shared_ptr<BasePart>> cachedParts;
-
         void RefreshCachedParts();
-    };
 
+        std::string GetClassName() const override { return "Workspace"; }
+        std::string GetName() const override { return m_debugName; }
+    };
 }

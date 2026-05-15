@@ -135,9 +135,9 @@ namespace Nova {
 
         bool changed = false;
         std::string newPaths[6] = {
-            sky->props.SkyboxRt, sky->props.SkyboxLf,
-            sky->props.SkyboxUp, sky->props.SkyboxDn,
-            sky->props.SkyboxBk, sky->props.SkyboxFt
+            sky->SkyboxRt, sky->SkyboxLf,
+            sky->SkyboxUp, sky->SkyboxDn,
+            sky->SkyboxBk, sky->SkyboxFt
         };
 
         if (currentSkyboxPaths[0].empty()) changed = true; // Initial load

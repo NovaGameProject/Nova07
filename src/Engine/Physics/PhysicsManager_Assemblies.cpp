@@ -45,7 +45,7 @@ namespace Nova {
                 if (!visited.insert(p.get()).second) continue;
                 component.push_back(p);
 
-                if (p->basePartProps && p->basePartProps->Anchored) hasAnchored = true;
+                if (p->anchored) hasAnchored = true;
                 
                 glm::vec3 sz = p->GetSize();
                 float volume = sz.x * sz.y * sz.z;
@@ -85,14 +85,14 @@ namespace Nova {
             assembly->rootPart = bestRoot.get();
             assembly->isStatic = hasAnchored;
 
-            CFrame rootCF = bestRoot->basePartProps->CFrame.get().to_nova();
+            CFrame rootCF = bestRoot->cframe;
             glm::mat4 invRoot = glm::inverse(rootCF.to_mat4());
 
             JPH::StaticCompoundShapeSettings compoundSettings;
             uint32_t index = 0;
             for (auto& p : component) {
                 assembly->parts.push_back(p);
-                CFrame partCF = p->basePartProps->CFrame.get().to_nova();
+                CFrame partCF = p->cframe;
                 CFrame relCF = CFrame::from_mat4(invRoot) * partCF;
                 assembly->relativeTransforms[p.get()] = relCF;
 

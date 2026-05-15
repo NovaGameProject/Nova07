@@ -359,7 +359,7 @@ namespace Nova {
         std::shared_ptr<Workspace> ws = nullptr;
         if (dm) {
             ws = dm->GetService<Workspace>();
-            if (ws) destroyHeight = ws->props.FallenPartsDestroyHeight;
+            if (ws) destroyHeight = ws->FallenPartsDestroyHeight;
         }
 
         std::vector<std::shared_ptr<BasePart>> toRemove;
@@ -369,13 +369,8 @@ namespace Nova {
                     toRemove.push_back(part);
                     continue;
                 }
-                if (part->basePartProps) {
-                    auto& cf = part->basePartProps->CFrame;
-                    auto nova_cf = cf.get().to_nova();
-                    nova_cf.position = update.position;
-                    nova_cf.rotation = glm::mat3_cast(update.rotation);
-                    cf = CFrameReflect::from_nova(nova_cf);
-                }
+                part->cframe.position = update.position;
+                part->cframe.rotation = glm::mat3_cast(update.rotation);
             }
         }
 

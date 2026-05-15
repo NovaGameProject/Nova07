@@ -7,7 +7,6 @@ Nova is born out of a desire to return to a simpler, community-driven platform, 
 
 ## 🛠️ Tech Stack
 - **Language:** C++20
-- **Reflection:** [reflect-cpp](https://github.com/getml/reflect-cpp)
 - **Rendering, input and window management:** [SDL3](https://github.com/libsdl-org/SDL)
 - **Scripting** [Luau](https://github.com/luau-lang/luau) and [LuaBridge3](https://github.com/kunitoki/LuaBridge3)
 - **License:** GPL v3
@@ -51,6 +50,7 @@ Other useful commands:
 xmake f -m release   # switch to release mode
 xmake clean          # clean build artifacts
 xmake install        # install to system (optional)
+```
 
 ## Contributing
 

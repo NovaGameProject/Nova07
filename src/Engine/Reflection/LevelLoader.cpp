@@ -8,18 +8,19 @@
 
 #include "Engine/Objects/InstanceFactory.hpp"
 #include "Engine/Reflection/LevelLoader.hpp"
+#include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Common/MathTypes.hpp"
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Objects/Model.hpp"
 #include <SDL3/SDL_log.h>
 #include <map>
+#include <set>
 #include <string>
 #include <pugixml.hpp>
 #include "Engine/Nova.hpp"
 
 namespace Nova {
 
-    // Helper to find all BaseParts in a tree
     void FindAllBaseParts(std::shared_ptr<Instance> inst, std::vector<std::shared_ptr<BasePart>>& out) {
         if (auto bp = std::dynamic_pointer_cast<BasePart>(inst)) {
             out.push_back(bp);
@@ -29,8 +30,6 @@ namespace Nova {
         }
     }
 
-    // This map stores <ReferentID, InstancePointer>
-    // Example: <"RBX0", shared_ptr<Part>>
     std::map<std::string, std::shared_ptr<Instance>> referentMap;
 
     void LevelLoader::PrintInstanceTree(std::shared_ptr<Nova::Instance> instance, int depth) {
@@ -40,35 +39,35 @@ namespace Nova {
         std::cout << indent << "[" << instance->GetClassName() << "] "
                   << instance->GetName() << std::endl;
 
-        rfl::Generic genericProps = instance->GetPropertiesGeneric();
-        auto var = genericProps.variant();
-
-        if (auto* obj = std::get_if<rfl::Object<rfl::Generic>>(&var)) {
-            for (const auto& [propName, propValue] : *obj) {
-                if (propName == "Name") continue;
-
-                std::cout << indent << "  prop " << propName << ": ";
-
-                // Helper to print values, including nested objects (Vector3, etc)
-                auto debugPrint = [](auto& self, const rfl::Generic& g) -> void {
-                    auto v = g.variant();
-                    if (auto* s = std::get_if<std::string>(&v)) std::cout << "\"" << *s << "\"";
-                    else if (auto* d = std::get_if<double>(&v)) std::cout << *d;
-                    else if (auto* i = std::get_if<long>(&v)) std::cout << *i;
-                    else if (auto* b = std::get_if<bool>(&v)) std::cout << (*b ? "true" : "false");
-                    else if (auto* o = std::get_if<rfl::Object<rfl::Generic>>(&v)) {
-                        std::cout << "{ ";
-                        for (auto it = o->begin(); it != o->end(); ++it) {
-                            std::cout << it->first << ": ";
-                            self(self, it->second); // Recursion!
-                            if (std::next(it) != o->end()) std::cout << ", ";
-                        }
-                        std::cout << " }";
+        // Print properties via ClassDescriptor
+        auto* desc = ClassDescriptor::Get(instance->GetClassName());
+        if (desc) {
+            for (auto& [name, accessor] : desc->properties) {
+                if (name == "Name") continue;
+                PropertyValue val = accessor->get(instance.get());
+                std::cout << indent << "  prop " << name << ": ";
+                switch (val.kind) {
+                    case PropertyValue::Kind::Nil: std::cout << "nil"; break;
+                    case PropertyValue::Kind::Bool: std::cout << (val.toBool() ? "true" : "false"); break;
+                    case PropertyValue::Kind::Int: std::cout << val.toInt(); break;
+                    case PropertyValue::Kind::Float: std::cout << val.toFloat(); break;
+                    case PropertyValue::Kind::String: std::cout << "\"" << val.toString() << "\""; break;
+                    case PropertyValue::Kind::Vector3: {
+                        auto& v = val.toVector3();
+                        std::cout << "Vector3(" << v.x << ", " << v.y << ", " << v.z << ")";
+                        break;
                     }
-                    else std::cout << "unknown";
-                };
-
-                debugPrint(debugPrint, propValue);
+                    case PropertyValue::Kind::CFrame: {
+                        auto& cf = val.toCFrame();
+                        std::cout << "CFrame(" << cf.position.x << ", " << cf.position.y << ", " << cf.position.z << ")";
+                        break;
+                    }
+                    case PropertyValue::Kind::Color3: {
+                        Color3 c = val.toColor3();
+                        std::cout << "Color3(" << c.r << ", " << c.g << ", " << c.b << ")";
+                        break;
+                    }
+                }
                 std::cout << std::endl;
             }
         }
@@ -100,21 +99,17 @@ namespace Nova {
 
         auto roblox = doc.child("roblox");
 
-        // Pass 1: Build the tree and the Referent Map
         for (auto item : roblox.children("Item")) {
             ProcessItemPass1(item, dataModel);
         }
 
-        // Pass 2: Resolve References (PrimaryPart, etc.)
         for (auto item : roblox.children("Item")) {
             ProcessItemPass2(item);
         }
 
-        // Finalize: Ensure Workspace has a CurrentCamera
         if (auto dm = std::dynamic_pointer_cast<DataModel>(dataModel)) {
             auto workspace = dm->GetService<Workspace>();
             if (!workspace->CurrentCamera) {
-                // Look for any camera in the children
                 for (auto& child : workspace->GetChildren()) {
                     if (auto cam = std::dynamic_pointer_cast<Camera>(child)) {
                         workspace->CurrentCamera = cam;
@@ -122,7 +117,6 @@ namespace Nova {
                     }
                 }
 
-                // Still no camera? Create one.
                 if (!workspace->CurrentCamera) {
                     auto cam = std::make_shared<Camera>();
                     cam->SetParent(workspace);
@@ -137,13 +131,12 @@ namespace Nova {
         if (physics) {
             physics->SetDeferRegistration(false);
 
-            // Initialize physics interpolation state for all parts
             std::vector<std::shared_ptr<BasePart>> parts;
             FindAllBaseParts(dataModel, parts);
             for (auto& part : parts) part->InitializePhysics();
         }
 
-        referentMap.clear(); // Clean up memory
+        referentMap.clear();
     }
 
     void LevelLoader::ProcessItemPass1(pugi::xml_node node, std::shared_ptr<Instance> parent) {
@@ -152,7 +145,6 @@ namespace Nova {
 
         std::shared_ptr<Instance> inst = nullptr;
 
-        // List of classes that should be treated as singletons/services
         static const std::set<std::string> serviceClasses = {
             "Workspace", "Lighting", "RunService", "Selection", "Debris"
         };
@@ -168,94 +160,110 @@ namespace Nova {
 
         if (!refId.empty()) referentMap[refId] = inst;
 
-        // 2. Build the Property Map (The bag of data for reflect-cpp)
-        rfl::Object<rfl::Generic> propMap;
+        // Parse properties from XML into PropertyValue map
+        std::map<std::string, PropertyValue> propMap;
         auto propsNode = node.child("Properties");
 
         for (auto prop : propsNode.children()) {
             std::string type = prop.name();
             std::string name = prop.attribute("name").value();
 
-            // Normalize names to match C++ struct (PascalCase)
+            // Normalize names to match Roblox API (PascalCase)
             if (name == "anchored") name = "Anchored";
             if (name == "canCollide") name = "CanCollide";
             if (name == "CoordinateFrame") name = "CFrame";
             if (name == "size") name = "Size";
             if (name == "archivable") name = "Archivable";
             if (name == "name") name = "Name";
+            if (name == "shape") name = "shape"; // PartType uses lowercase in some files
 
-            if (type == "string") propMap[name] = rfl::Generic(std::string(prop.text().get()));
-            else if (type == "bool")   propMap[name] = rfl::Generic(prop.text().as_bool());
-            else if (type == "float")  propMap[name] = rfl::Generic(prop.text().as_float());
-            else if (type == "token" || type == "int") {
-                // Enums/Tokens must be int64_t for rfl::Generic to be safe
-                propMap[name] = rfl::Generic(static_cast<int64_t>(prop.text().as_int()));
+            if (type == "string") {
+                propMap[name] = PropertyValue(std::string(prop.text().get()));
             }
-
-
+            else if (type == "bool") {
+                propMap[name] = PropertyValue(prop.text().as_bool());
+            }
+            else if (type == "float") {
+                propMap[name] = PropertyValue(prop.text().as_float());
+            }
+            else if (type == "token" || type == "int") {
+                propMap[name] = PropertyValue(static_cast<int64_t>(prop.text().as_int()));
+            }
             else if (type == "Vector3") {
-                rfl::Object<rfl::Generic> v3;
-                v3["x"] = rfl::Generic(prop.child("X").text().as_float());
-                v3["y"] = rfl::Generic(prop.child("Y").text().as_float());
-                v3["z"] = rfl::Generic(prop.child("Z").text().as_float());
-                propMap[name] = rfl::Generic(v3);
+                propMap[name] = PropertyValue(Vector3(
+                    prop.child("X").text().as_float(),
+                    prop.child("Y").text().as_float(),
+                    prop.child("Z").text().as_float()
+                ));
             }
             else if (type == "CoordinateFrame") {
-                rfl::Object<rfl::Generic> cf;
-
-                // Explicitly cast to float. reflect-cpp is very picky!
-                cf["x"] = rfl::Generic(static_cast<float>(prop.child("X").text().as_float()));
-                cf["y"] = rfl::Generic(static_cast<float>(prop.child("Y").text().as_float()));
-                cf["z"] = rfl::Generic(static_cast<float>(prop.child("Z").text().as_float()));
-
-                cf["r00"] = rfl::Generic(static_cast<float>(prop.child("R00").text().as_float()));
-                cf["r01"] = rfl::Generic(static_cast<float>(prop.child("R01").text().as_float()));
-                cf["r02"] = rfl::Generic(static_cast<float>(prop.child("R02").text().as_float()));
-
-                cf["r10"] = rfl::Generic(static_cast<float>(prop.child("R10").text().as_float()));
-                cf["r11"] = rfl::Generic(static_cast<float>(prop.child("R11").text().as_float()));
-                cf["r12"] = rfl::Generic(static_cast<float>(prop.child("R12").text().as_float()));
-
-                cf["r20"] = rfl::Generic(static_cast<float>(prop.child("R20").text().as_float()));
-                cf["r21"] = rfl::Generic(static_cast<float>(prop.child("R21").text().as_float()));
-                cf["r22"] = rfl::Generic(static_cast<float>(prop.child("R22").text().as_float()));
-
-                propMap[name] = rfl::Generic(cf);
+                CFrame cf;
+                cf.position = {
+                    prop.child("X").text().as_float(),
+                    prop.child("Y").text().as_float(),
+                    prop.child("Z").text().as_float()
+                };
+                // XML stores rows (R00,R01,R02 is row 0), GLM stores columns
+                // So we need to transpose: column 0 = {R00, R10, R20}
+                cf.rotation[0] = glm::vec3(
+                    prop.child("R00").text().as_float(),
+                    prop.child("R10").text().as_float(),
+                    prop.child("R20").text().as_float()
+                );
+                cf.rotation[1] = glm::vec3(
+                    prop.child("R01").text().as_float(),
+                    prop.child("R11").text().as_float(),
+                    prop.child("R21").text().as_float()
+                );
+                cf.rotation[2] = glm::vec3(
+                    prop.child("R02").text().as_float(),
+                    prop.child("R12").text().as_float(),
+                    prop.child("R22").text().as_float()
+                );
+                propMap[name] = PropertyValue(cf);
             }
             else if (type == "Color3") {
-                rfl::Object<rfl::Generic> col;
                 std::string val = prop.text().get();
+                Color3 col;
                 if (val.find(',') != std::string::npos) {
-                    // Float triplet (0.1, 0.5, 0.8)
                     std::stringstream ss(val);
                     std::string segment;
                     float channels[3] = {0,0,0};
-                    for(int i=0; i<3 && std::getline(ss, segment, ','); ++i) {
+                    for (int i = 0; i < 3 && std::getline(ss, segment, ','); ++i) {
                         channels[i] = std::stof(segment);
                     }
-                    col["r"] = rfl::Generic(channels[0]);
-                    col["g"] = rfl::Generic(channels[1]);
-                    col["b"] = rfl::Generic(channels[2]);
+                    col = Color3(channels[0], channels[1], channels[2]);
                 } else {
-                    // stoul handles the large unsigned integer string
                     uint32_t packed = std::stoul(val);
-                    col["r"] = rfl::Generic((float)((packed >> 16) & 0xFF) / 255.0f);
-                    col["g"] = rfl::Generic((float)((packed >> 8) & 0xFF) / 255.0f);
-                    col["b"] = rfl::Generic((float)(packed & 0xFF) / 255.0f);
+                    col = Color3(
+                        (float)((packed >> 16) & 0xFF) / 255.0f,
+                        (float)((packed >> 8) & 0xFF) / 255.0f,
+                        (float)(packed & 0xFF) / 255.0f
+                    );
                 }
-                propMap[name] = rfl::Generic(col);
+                propMap[name] = PropertyValue::FromColor3(col);
             }
         }
 
-        // 3. Apply everything via reflection
-        inst->ApplyPropertiesGeneric(rfl::Generic(propMap));
+        // Apply properties via ClassDescriptor
+        auto* desc = ClassDescriptor::Get(inst->GetClassName());
+        for (const auto& [name, value] : propMap) {
+            auto* current = desc;
+            while (current) {
+                if (auto it = current->properties.find(name); it != current->properties.end()) {
+                    it->second->set(inst.get(), value);
+                    break;
+                }
+                current = current->baseClass;
+            }
+        }
 
-        // 4. Set parent (triggers OnAncestorChanged and physics registration)
+        // Set parent
         if (parent && !inst->GetParent()) {
             inst->SetParent(parent);
         }
 
-        // 5. Recurse children
+        // Recurse children
         for (auto child : node.children("Item")) {
             ProcessItemPass1(child, inst);
         }
@@ -274,7 +282,6 @@ namespace Nova {
             if (targetRef != "null" && referentMap.contains(targetRef)) {
                 auto target = referentMap[targetRef];
 
-                // Handle specific non-reflected references
                 if (propName == "PrimaryPart") {
                     if (auto mod = std::dynamic_pointer_cast<Model>(inst)) {
                         mod->PrimaryPart = target;
@@ -303,35 +310,5 @@ namespace Nova {
         for (auto child : node.children("Item")) {
             ProcessItemPass2(child);
         }
-    }
-
-    // Specialized 2007 CoordinateFrame Parser
-    CFrame Parse2007CFrame(pugi::xml_node node) {
-        CFrame cf;
-        cf.position = {
-            node.child("X").text().as_float(),
-            node.child("Y").text().as_float(),
-            node.child("Z").text().as_float()
-        };
-        // Roblox 2007 uses a 3x3 rotation matrix (R00-R22)
-        cf.rotation[0][0] = node.child("R00").text().as_float();
-        cf.rotation[0][1] = node.child("R01").text().as_float();
-        cf.rotation[0][2] = node.child("R02").text().as_float();
-        cf.rotation[1][0] = node.child("R10").text().as_float();
-        cf.rotation[1][1] = node.child("R11").text().as_float();
-        cf.rotation[1][2] = node.child("R12").text().as_float();
-        cf.rotation[2][0] = node.child("R20").text().as_float();
-        cf.rotation[2][1] = node.child("R21").text().as_float();
-        cf.rotation[2][2] = node.child("R22").text().as_float();
-        return cf;
-    }
-
-    // Specialized 2007 Vector3 Parser
-    Vector3 Parse2007Vector3(pugi::xml_node node) {
-        return Vector3(
-            node.child("X").text().as_float(),
-            node.child("Y").text().as_float(),
-            node.child("Z").text().as_float()
-        );
     }
 }

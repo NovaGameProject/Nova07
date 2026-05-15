@@ -2,11 +2,11 @@
   {
     "label": "Debug native binary",
     "build": {
-      "command": "cmake --build .",
-      "cwd": "$ZED_WORKTREE_ROOT/build",
+      "command": "xmake f -m debug && xmake build",
+      "cwd": "$ZED_WORKTREE_ROOT",
     },
     "cwd": "$ZED_WORKTREE_ROOT/",
-    "program": "$ZED_WORKTREE_ROOT/build/Nova07",
+    "program": "$ZED_WORKTREE_ROOT/build/linux/x86_64/debug/Nova07",
     "request": "launch",
     "adapter": "CodeLLDB",
   },
