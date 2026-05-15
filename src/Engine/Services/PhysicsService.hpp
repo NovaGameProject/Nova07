@@ -31,6 +31,7 @@ namespace Nova {
 
     class BasePart;
     class JointInstance;
+    class Humanoid;
     enum class SurfaceType : int;
     class ContactListenerImpl;
 
@@ -91,6 +92,11 @@ namespace Nova {
         void RequestAssemblyUpdate(BasePart* part);
         void BreakJoints(BasePart* part);
         void BreakJointsInRadius(glm::vec3 position, float radius);
+
+        // Humanoid Management
+        void RegisterHumanoid(std::shared_ptr<Humanoid> humanoid);
+        void UnregisterHumanoid(Humanoid* humanoid);
+        void UpdateHumanoids(float dt);
         
         // Queue explosion for processing on physics thread (thread-safe)
         void QueueExplosion(glm::vec3 position, float radius, float pressure);
@@ -144,6 +150,10 @@ namespace Nova {
 
         // Tracks ALL bodies currently alive in Jolt
         std::unordered_set<JPH::BodyID, BodyIDHasher> mAllActiveBodies;
+
+        // Humanoid tracking
+        std::vector<std::shared_ptr<Humanoid>> mHumanoids;
+        std::mutex mHumanoidMutex;
 
     private:
         void SyncTransforms();

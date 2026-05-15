@@ -15,6 +15,7 @@ add_requires("luabridge3")
 add_requires("glm")
 add_requires("joltphysics")
 add_requires("pugixml")
+add_requires("enet")
 add_requires("tracy v0.12.2", { configs = { on_demand = true } })
 
 -- Shader compilation rule using glslc (from shaderc)
@@ -59,7 +60,7 @@ target("Nova07")
     set_kind("binary")
     set_default(true)
 
-    add_files("src/**.cpp")
+    add_files("src/**.cpp|ncc_main.cpp")
     add_includedirs("src")
 
     add_rules("hlsl2spv")
@@ -76,5 +77,31 @@ target("Nova07")
         "glm",
         "joltphysics",
         "pugixml",
+        "enet",
+        "tracy"
+    )
+
+target("NCCService")
+    set_kind("binary")
+    set_default(false)
+
+    add_files("src/**.cpp|main.cpp")
+    add_includedirs("src")
+
+    add_rules("hlsl2spv")
+    add_files("shaders/**.hlsl")
+
+    add_defines("TRACY_ENABLE")
+
+    add_packages(
+        "libsdl3",
+        "libsdl3_image",
+        "shaderc",
+        "luau",
+        "luabridge3",
+        "glm",
+        "joltphysics",
+        "pugixml",
+        "enet",
         "tracy"
     )

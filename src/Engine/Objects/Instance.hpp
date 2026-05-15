@@ -27,6 +27,8 @@
 namespace Nova {
     class DataModel;
 
+    using NetworkID = uint32_t;
+
     class Instance : public std::enable_shared_from_this<Instance> {
     public:
         virtual ~Instance() = default;
@@ -40,6 +42,7 @@ namespace Nova {
         std::vector<std::shared_ptr<Instance>> children;
 
         std::string m_debugName;
+        NetworkID networkID = 0;  // 0 = not replicated
         Instance(std::string name) : m_debugName(name) {}
 
         std::shared_ptr<Instance> GetParent() const { return parent.lock(); }

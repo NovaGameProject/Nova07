@@ -11,17 +11,21 @@
 #include "Engine/Objects/Explosion.hpp"
 #include "Engine/Objects/Script.hpp"
 #include "Engine/Objects/LocalScript.hpp"
+#include "Engine/Objects/Humanoid.hpp"
+#include "Engine/Objects/Player.hpp"
+#include "Engine/Objects/RemoteEvent.hpp"
+#include "Engine/Objects/RemoteFunction.hpp"
 
 namespace Nova {
     void RegisterClasses() {
         // BasePart
         ClassDescriptorBuilder<BasePart>("BasePart", "Instance")
-            .Property("CFrame", &BasePart::cframe)
-            .Property("Size", &BasePart::size)
-            .Property("Anchored", &BasePart::anchored)
-            .Property("CanCollide", &BasePart::canCollide)
-            .Property("Transparency", &BasePart::transparency)
-            .Property("BrickColor", &BasePart::brickColor)
+            .Property("CFrame", &BasePart::cframe).Replicated("CFrame")
+            .Property("Size", &BasePart::size).Replicated("Size")
+            .Property("Anchored", &BasePart::anchored).Replicated("Anchored")
+            .Property("CanCollide", &BasePart::canCollide).Replicated("CanCollide")
+            .Property("Transparency", &BasePart::transparency).Replicated("Transparency")
+            .Property("BrickColor", &BasePart::brickColor).Replicated("BrickColor")
             .Property("TopSurface", &BasePart::topSurface)
             .Property("BottomSurface", &BasePart::bottomSurface)
             .Property("LeftSurface", &BasePart::leftSurface)
@@ -126,6 +130,39 @@ namespace Nova {
             .Property("BlastRadius", &Explosion::BlastRadius)
             .Property("BlastPressure", &Explosion::BlastPressure)
             .Signal("Hit", &Explosion::Hit);
+
+        // Humanoid
+        ClassDescriptorBuilder<Humanoid>("Humanoid", "Instance")
+            .Property("Health", &Humanoid::Health).Replicated("Health")
+            .Property("MaxHealth", &Humanoid::MaxHealth).Replicated("MaxHealth")
+            .Property("WalkSpeed", &Humanoid::WalkSpeed).Replicated("WalkSpeed")
+            .Property("JumpPower", &Humanoid::JumpPower).Replicated("JumpPower")
+            .Signal("HealthChanged", &Humanoid::HealthChanged)
+            .Signal("Died", &Humanoid::Died)
+            .Signal("Touched", &Humanoid::Touched)
+            .Method("TakeDamage", &Humanoid::TakeDamage)
+            .Method("Move", &Humanoid::Move)
+            .Method("Jump", &Humanoid::Jump)
+            .Method("Respawn", &Humanoid::Respawn);
+
+        // Player
+        ClassDescriptorBuilder<Player>("Player", "Instance")
+            .Signal("CharacterAdded", &Player::CharacterAdded)
+            .Signal("CharacterRemoving", &Player::CharacterRemoving)
+            .Method("Kick", &Player::Kick);
+
+        // RemoteEvent
+        ClassDescriptorBuilder<RemoteEvent>("RemoteEvent", "Instance")
+            .Signal("OnServerEvent", &RemoteEvent::OnServerEvent)
+            .Signal("OnClientEvent", &RemoteEvent::OnClientEvent)
+            .Method("FireServer", &RemoteEvent::FireServer)
+            .Method("FireClient", &RemoteEvent::FireClient)
+            .Method("FireAllClients", &RemoteEvent::FireAllClients);
+
+        // RemoteFunction
+        ClassDescriptorBuilder<RemoteFunction>("RemoteFunction", "Instance")
+            .Method("InvokeServer", &RemoteFunction::InvokeServer)
+            .Method("InvokeClient", &RemoteFunction::InvokeClient);
 
         // Resolve inheritance pointers after all classes are registered
         ClassDescriptor::ResolveInheritance();

@@ -26,6 +26,10 @@
 #include "Engine/Objects/Explosion.hpp"
 #include "Engine/Objects/Script.hpp"
 #include "Engine/Objects/LocalScript.hpp"
+#include "Engine/Objects/Humanoid.hpp"
+#include "Engine/Objects/Player.hpp"
+#include "Engine/Objects/RemoteEvent.hpp"
+#include "Engine/Objects/RemoteFunction.hpp"
 
 // Services
 #include "Engine/Services/DataModel.hpp"
@@ -33,3 +37,8 @@
 #include "Engine/Services/Lighting.hpp"
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Services/ScriptContext.hpp"
+#include "Engine/Services/NetworkService.hpp"
+
+// Networking
+#include "Engine/Networking/NetworkID.hpp"
+#include "Engine/Networking/ReplicationProtocol.hpp"

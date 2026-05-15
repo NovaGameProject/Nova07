@@ -10,9 +10,14 @@
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/Lighting.hpp"
+#include "Engine/Services/NetworkService.hpp"
 #include "Engine/Common/Signal.hpp"
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Engine/Objects/InstanceFactory.hpp"
+#include "Engine/Objects/Humanoid.hpp"
+#include "Engine/Objects/Player.hpp"
+#include "Engine/Objects/RemoteEvent.hpp"
+#include "Engine/Objects/RemoteFunction.hpp"
 #include "Common/MathTypes.hpp"
 #include "Common/Log.hpp"
 #include "Luau/Compiler.h"
@@ -264,6 +269,11 @@ namespace Nova {
         luabridge::getGlobalNamespace(L).deriveClass<Script, Instance>("Script").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<LocalScript, Script>("LocalScript").endClass();
         luabridge::getGlobalNamespace(L).deriveClass<Explosion, Instance>("Explosion").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Humanoid, Instance>("Humanoid").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<Player, Instance>("Player").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<RemoteEvent, Instance>("RemoteEvent").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<RemoteFunction, Instance>("RemoteFunction").endClass();
+        luabridge::getGlobalNamespace(L).deriveClass<NetworkService, Instance>("NetworkService").endClass();
     }
 
     void ScriptContext::ProcessScheduledTasks() {

@@ -16,6 +16,10 @@
 #include "Engine/Objects/Explosion.hpp"
 #include "Engine/Objects/Script.hpp"
 #include "Engine/Objects/LocalScript.hpp"
+#include "Engine/Objects/Humanoid.hpp"
+#include "Engine/Objects/Player.hpp"
+#include "Engine/Objects/RemoteEvent.hpp"
+#include "Engine/Objects/RemoteFunction.hpp"
 
 namespace Nova {
     class InstanceFactory {
@@ -76,6 +80,14 @@ namespace Nova {
             Register<Hinge>("Hinge");
             Register<VelocityMotor>("VelocityMotor");
             Register<Explosion>("Explosion");
+
+            // Character
+            Register<Humanoid>("Humanoid");
+
+            // Networking
+            Register<Player>("Player");
+            Register<RemoteEvent>("RemoteEvent");
+            Register<RemoteFunction>("RemoteFunction");
         }
     };
 }

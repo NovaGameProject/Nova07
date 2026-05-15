@@ -9,6 +9,7 @@
 #pragma once
 #include <string>
 #include <map>
+#include <set>
 #include <memory>
 #include <functional>
 #include <iostream>
@@ -153,6 +154,7 @@ namespace Nova {
         std::map<std::string, std::shared_ptr<IPropertyAccessor>> properties;
         std::map<std::string, MethodDescriptor> methods;
         std::map<std::string, SignalDescriptor> signals;
+        std::set<std::string> replicatedProperties;  // Properties that replicate over network
 
         // Walk inheritance chain to find a property
         const IPropertyAccessor* FindProperty(const std::string& name) const {
@@ -229,6 +231,12 @@ namespace Nova {
             else k = PropertyKind::String; // fallback
 
             desc->properties[name] = std::make_shared<PropertyAccessor<T, U>>(member, k);
+            return *this;
+        }
+
+        // Mark a property for network replication
+        ClassDescriptorBuilder& Replicated(const std::string& name) {
+            desc->replicatedProperties.insert(name);
             return *this;
         }
 

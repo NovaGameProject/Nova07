@@ -10,4 +10,28 @@
     "request": "launch",
     "adapter": "CodeLLDB",
   },
+  {
+    "label": "Debug NCCService (server)",
+    "build": {
+      "command": "xmake f -m debug && xmake build NCCService",
+      "cwd": "$ZED_WORKTREE_ROOT",
+    },
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "program": "$ZED_WORKTREE_ROOT/build/linux/x86_64/debug/NCCService",
+    "args": ["--level", "./resources/Places/RobloxHQ.rbxl", "--port", "27015"],
+    "request": "launch",
+    "adapter": "CodeLLDB",
+  },
+  {
+    "label": "Debug Client (connect to server)",
+    "build": {
+      "command": "xmake f -m debug && xmake build",
+      "cwd": "$ZED_WORKTREE_ROOT",
+    },
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "program": "$ZED_WORKTREE_ROOT/build/linux/x86_64/debug/Nova07",
+    "args": ["--connect", "127.0.0.1", "--port", "27015"],
+    "request": "launch",
+    "adapter": "CodeLLDB",
+  },
 ]

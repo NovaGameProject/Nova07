@@ -9,6 +9,7 @@
 #include "PhysicsService.hpp"
 #include "Engine/Objects/BasePart.hpp"
 #include "Engine/Objects/JointInstance.hpp"
+#include "Engine/Objects/Humanoid.hpp"
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Physics/ContactListener.hpp"
@@ -433,6 +434,29 @@ namespace Nova {
         {
             std::lock_guard<std::mutex> lock(mBufferMutex);
             mTransformBuffer.insert(mTransformBuffer.end(), updates.begin(), updates.end());
+        }
+    }
+
+    void PhysicsService::RegisterHumanoid(std::shared_ptr<Humanoid> humanoid) {
+        std::lock_guard<std::mutex> lock(mHumanoidMutex);
+        mHumanoids.push_back(humanoid);
+        humanoid->InitializePhysics(std::static_pointer_cast<PhysicsService>(shared_from_this()));
+    }
+
+    void PhysicsService::UnregisterHumanoid(Humanoid* humanoid) {
+        std::lock_guard<std::mutex> lock(mHumanoidMutex);
+        auto it = std::find_if(mHumanoids.begin(), mHumanoids.end(),
+            [humanoid](const std::shared_ptr<Humanoid>& h) { return h.get() == humanoid; });
+        if (it != mHumanoids.end()) {
+            (*it)->CleanupPhysics();
+            mHumanoids.erase(it);
+        }
+    }
+
+    void PhysicsService::UpdateHumanoids(float dt) {
+        std::lock_guard<std::mutex> lock(mHumanoidMutex);
+        for (auto& humanoid : mHumanoids) {
+            humanoid->Update(dt);
         }
     }
 }
