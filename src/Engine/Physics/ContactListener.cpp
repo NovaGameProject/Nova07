@@ -138,7 +138,6 @@ namespace Nova {
 
             if (index < assembly->parts.size()) {
                 if (auto part = assembly->parts[index].lock()) {
-                    std::cout << "[JointBreakCollector] Found part: " << part->GetName() << std::endl;
                     mapLock.unlock();
                     service->BreakJoints(part.get());
                 }

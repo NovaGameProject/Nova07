@@ -13,7 +13,7 @@
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
-#include <iostream>
+#include "Common/Log.hpp"
 
 namespace Nova {
     std::shared_ptr<DataModel> Instance::GetDataModel() {
@@ -84,6 +84,21 @@ namespace Nova {
         if (skey == "Parent") return luabridge::LuaRef(L, self.GetParent());
         if (skey == "ClassName") return luabridge::LuaRef(L, self.GetClassName());
 
+        // 1b. Derived properties
+        if (skey == "Position") {
+            auto* desc = ClassDescriptor::Get(self.GetClassName());
+            while (desc) {
+                if (auto it = desc->properties.find("CFrame"); it != desc->properties.end()) {
+                    PropertyValue val = it->second->get(&self);
+                    if (val.isCFrame()) {
+                        return luabridge::LuaRef(L, val.toCFrame().position);
+                    }
+                    break;
+                }
+                desc = desc->baseClass;
+            }
+        }
+
         // 2. Walk the ClassDescriptor chain
         auto* desc = ClassDescriptor::Get(self.GetClassName());
         while (desc) {
@@ -126,7 +141,15 @@ namespace Nova {
         if (!key.isString()) return luabridge::LuaRef(L);
         std::string skey = key.unsafe_cast<std::string>();
 
-        // 1. Special case: Parent
+        // 1. Special case: Name
+        if (skey == "Name") {
+            if (value.isString()) {
+                self.m_debugName = value.unsafe_cast<std::string>();
+            }
+            return luabridge::LuaRef(L);
+        }
+
+        // 2. Special case: Parent
         if (skey == "Parent") {
             if (value.isNil()) {
                 self.SetParent(nullptr);
@@ -143,24 +166,60 @@ namespace Nova {
             return luabridge::LuaRef(L);
         }
 
-        // 2. Convert value to PropertyValue
+        // 3. Special case: Position
+        if (skey == "Position") {
+            luabridge::push(L, value);
+            if (luabridge::Stack<Vector3>::isInstance(L, -1)) {
+                auto result = luabridge::Stack<Vector3>::get(L, -1);
+                if (result) {
+                    Vector3 pos = result.value();
+                    auto* desc = ClassDescriptor::Get(self.GetClassName());
+                    while (desc) {
+                        // First try: find CFrame and update its position (for BasePart, etc.)
+                        if (auto it = desc->properties.find("CFrame"); it != desc->properties.end()) {
+                            PropertyValue cfVal = it->second->get(&self);
+                            if (cfVal.isCFrame()) {
+                                CFrame cf = cfVal.toCFrame();
+                                cf.position = pos;
+                                it->second->set(&self, PropertyValue(cf));
+                                self.OnPropertyChanged("CFrame");
+                            }
+                            lua_pop(L, 1);
+                            return luabridge::LuaRef(L);
+                        }
+                        // Second try: find Position directly (for Explosion, etc.)
+                        if (auto it = desc->properties.find("Position"); it != desc->properties.end()) {
+                            it->second->set(&self, PropertyValue(pos));
+                            self.OnPropertyChanged("Position");
+                            lua_pop(L, 1);
+                            return luabridge::LuaRef(L);
+                        }
+                        desc = desc->baseClass;
+                    }
+                }
+            }
+            lua_pop(L, 1);
+            return luabridge::LuaRef(L);
+        }
+
+        // 4. Convert value to PropertyValue
         PropertyValue propVal = luaToPropertyValue(value);
 
-        // 3. Walk the ClassDescriptor chain to find and set the property
+        // 5. Walk the ClassDescriptor chain to find and set the property
         auto* desc = ClassDescriptor::Get(self.GetClassName());
         while (desc) {
             if (auto it = desc->properties.find(skey); it != desc->properties.end()) {
                 if (it->second->set(&self, propVal)) {
                     self.OnPropertyChanged(skey);
                 } else {
-                    std::cerr << "Failed to set property " << skey << " on " << self.GetClassName() << std::endl;
+                    LOG_WRN("Instance", "Failed to set property '%s' on %s", skey.c_str(), self.GetClassName().c_str());
                 }
                 return luabridge::LuaRef(L);
             }
             desc = desc->baseClass;
         }
 
-        std::cerr << "Unknown property " << skey << " on " << self.GetClassName() << std::endl;
+        // Silently ignore unknown properties — Lua scripts may set arbitrary keys
         return luabridge::LuaRef(L);
     }
 

@@ -12,6 +12,7 @@
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Physics/ContactListener.hpp"
+#include "Common/Log.hpp"
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
@@ -24,11 +25,9 @@
 #include <Jolt/Physics/Constraints/HingeConstraint.h>
 #include <Jolt/Physics/Body/BodyLockMulti.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
-#include <SDL3/SDL_log.h>
 #include <cstdarg>
 #include <thread>
 #include <unordered_set>
-#include <iostream>
 
 namespace Nova {
 
@@ -38,13 +37,13 @@ namespace Nova {
         char buffer[1024];
         vsnprintf(buffer, sizeof(buffer), inFMT, list);
         va_end(list);
-        SDL_Log("Jolt: %s", buffer);
+        LOG_DBG("Jolt", "%s", buffer);
     }
 
 #ifdef JPH_ENABLE_ASSERTS
     static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine) {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "JPH_ASSERT FAILED: %s (%s) at %s:%u", inExpression, inMessage ? inMessage : "no message", inFile, inLine);
-        return true; 
+        LOG_ERR("Jolt", "ASSERT FAILED: %s (%s) at %s:%u", inExpression, inMessage ? inMessage : "no message", inFile, inLine);
+        return true;
     }
 #endif
 
@@ -70,7 +69,7 @@ namespace Nova {
         physicsSystem->Init(262144, 2096, 262144, 262144, *bp_interface, *obp_filter, *olp_filter);
         physicsSystem->SetContactListener(contact_listener.get());
         physicsSystem->SetGravity(JPH::Vec3(0, -196.2f, 0));
-        
+
         JPH::PhysicsSettings settings;
         settings.mPointVelocitySleepThreshold = 1.0f;
         settings.mNumVelocitySteps = 4;
@@ -100,9 +99,9 @@ namespace Nova {
                 lastTime = now;
                 if (dt > 0) {
                     std::lock_guard<std::recursive_mutex> lock(mPhysicsMutex);
-                    ProcessExplosions();  
+                    ProcessExplosions();
                     ProcessQueuedMutations();
-                    UpdateAssemblies();  
+                    UpdateAssemblies();
                     float internalDt = std::min(dt, 1.0f / 60.0f);
                     physicsSystem->Update(internalDt, 1, tempAllocator, jobSystem);
                     SyncTransforms();
@@ -139,13 +138,13 @@ namespace Nova {
         std::unique_lock<std::shared_mutex> mapLock(mMapsMutex);
         for (auto* part : parts) {
             mPartToJoints.erase(part);
-            
+
             auto itAss = mPartToAssembly.find(part);
             if (itAss != mPartToAssembly.end()) {
                 auto assembly = itAss->second;
                 // Don't erase from assembly->parts here, UpdateAssemblies will handle it
                 // because it's a vector of weak_ptrs now.
-                
+
                 // Find first alive part to trigger rebuild
                 for (auto& wp : assembly->parts) {
                     if (auto alive = wp.lock()) {
@@ -251,22 +250,20 @@ namespace Nova {
 
     void PhysicsService::BreakJoints(BasePart* part) {
         if (!part) return;
-        
+
         std::lock_guard<std::recursive_mutex> lock(mQueueMutex);
         std::unique_lock<std::shared_mutex> mapLock(mMapsMutex);
-
-        std::cout << "[BreakJoints] Breaking joints for part: " << part->GetName() << std::endl;
 
         auto it = mPartToJoints.find(part);
         if (it != mPartToJoints.end()) {
             auto joints = it->second;
             it->second.clear();
-            
+
             for (auto& weakJoint : joints) {
                 if (auto joint = weakJoint.lock()) {
                     auto p0 = joint->Part0.lock();
                     auto p1 = joint->Part1.lock();
-                    
+
                     BasePart* other = (p0.get() == part) ? p1.get() : p0.get();
                     if (other) {
                         auto itOther = mPartToJoints.find(other);
@@ -282,7 +279,7 @@ namespace Nova {
                         mPendingConstraintRemovals.push_back(joint->physicsConstraint);
                         joint->physicsConstraint = nullptr;
                     }
-                    
+
                     mPendingJointDestructions.push_back(joint);
                 }
             }
@@ -292,11 +289,11 @@ namespace Nova {
         if (it2 != mPartToAutoJoints.end()) {
             auto reqs = it2->second;
             it2->second.clear();
-            
+
             for (auto& req : reqs) {
                 auto p0 = req->part1.lock();
                 auto p1 = req->part2.lock();
-                
+
                 BasePart* other = (p0.get() == part) ? p1.get() : p0.get();
                 if (other) {
                     auto itOther2 = mPartToAutoJoints.find(other);
@@ -306,9 +303,9 @@ namespace Nova {
                     }
                     mPendingAssemblyUpdates.push_back(std::static_pointer_cast<BasePart>(other->shared_from_this()));
                 }
-                
+
                 mInternalJointsToRemove.push_back(req);
-                
+
                 if (p0 && p1) {
                     PartPair pair = { reinterpret_cast<uint64_t>(p0.get()), reinterpret_cast<uint64_t>(p1.get()) };
                     if (pair.first > pair.second) std::swap(pair.first, pair.second);

@@ -14,9 +14,9 @@
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Engine/Objects/InstanceFactory.hpp"
 #include "Common/MathTypes.hpp"
+#include "Common/Log.hpp"
 #include "Luau/Compiler.h"
 #include "Luau/BytecodeBuilder.h"
-#include <iostream>
 #include <chrono>
 #include <queue>
 
@@ -283,7 +283,7 @@ namespace Nova {
                 if (co) {
                     int status = lua_resume(co, L, 0);
                     if (status != LUA_OK && status != LUA_YIELD) {
-                        std::cerr << "Coroutine error: " << lua_tostring(co, -1) << std::endl;
+                        LOG_ERR("Script", "Coroutine error: %s", lua_tostring(co, -1));
                         lua_pop(co, 1);
                     }
                 }
@@ -306,11 +306,11 @@ namespace Nova {
 
         if (luau_load(L, chunkName.c_str(), bytecode.data(), bytecode.size(), 0) == 0) {
             if (lua_pcall(L, 0, 0, 0) != 0) {
-                std::cerr << "Script Error: [string \"" << chunkName << "\"]:" << lua_tostring(L, -1) << std::endl;
+                LOG_ERR("Script", "[%s] %s", chunkName.c_str(), lua_tostring(L, -1));
                 lua_pop(L, 1);
             }
         } else {
-            std::cerr << "Compile Error: " << lua_tostring(L, -1) << std::endl;
+            LOG_ERR("Script", "Compile error in '%s': %s", chunkName.c_str(), lua_tostring(L, -1));
             lua_pop(L, 1);
         }
     }

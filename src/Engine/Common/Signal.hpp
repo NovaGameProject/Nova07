@@ -1,11 +1,3 @@
-// Nova Game Engine
-// Copyright (C) 2026  brambora69123
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
 #pragma once
 #include <lua.h>
 #include <lualib.h>
@@ -21,7 +13,6 @@
 #include <vector>
 #include <memory>
 #include <functional>
-#include <iostream>
 
 namespace Nova {
     class Connection {
@@ -48,7 +39,6 @@ namespace Nova {
             return conn;
         }
 
-        // For C++ side firing with variadic args
         template<typename... Args>
         void fire(Args&&... args) {
             for (auto it = connections.begin(); it != connections.end();) {
@@ -58,7 +48,7 @@ namespace Nova {
                     try {
                         (*it)->callback(std::forward<Args>(args)...);
                     } catch (const luabridge::LuaException& e) {
-                        std::cerr << "Signal Error: " << e.what() << std::endl;
+                        // Silently ignore signal errors to avoid spam
                     }
                     ++it;
                 }

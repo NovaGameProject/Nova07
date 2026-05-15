@@ -10,6 +10,7 @@
 #include "Engine/Reflection/LevelLoader.hpp"
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Common/MathTypes.hpp"
+#include "Common/Log.hpp"
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Objects/Model.hpp"
 #include <SDL3/SDL_log.h>
@@ -121,7 +122,7 @@ namespace Nova {
                     auto cam = std::make_shared<Camera>();
                     cam->SetParent(workspace);
                     workspace->CurrentCamera = cam;
-                    SDL_Log("No camera found in file, created default Camera.");
+                    LOG_INF("LevelLoader", "No camera found, created default Camera.");
                 }
             }
 

@@ -10,6 +10,7 @@
 #include "Geometry.hpp"
 #include "Engine/Services/Lighting.hpp"
 #include "Engine/Objects/Sky.hpp"
+#include "Common/Log.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <SDL3_image/SDL_image.h>
 #include <cstring>
@@ -33,19 +34,16 @@ namespace Nova {
         // Load Surfaces.png using SDL_image (64x512)
         SDL_Surface* atlas = IMG_Load("resources/textures/Surfaces.png");
         if (!atlas) {
-            SDL_Log("Failed to load Surfaces.png: %s", SDL_GetError());
-            // Create a default white surface if file is missing or unsupported
+            LOG_WRN("Renderer", "Failed to load Surfaces.png, using fallback");
             atlas = SDL_CreateSurface(64, 64 * 8, SDL_PIXELFORMAT_RGBA32);
             SDL_FillSurfaceRect(atlas, NULL, SDL_MapSurfaceRGBA(atlas, 255, 255, 255, 255));
         }
-
-        SDL_Log("Loaded Surfaces.png: %dx%d", atlas->w, atlas->h);
 
         SDL_Surface* atlasRGBA = SDL_ConvertSurface(atlas, SDL_PIXELFORMAT_RGBA32);
         SDL_DestroySurface(atlas);
 
         if (!atlasRGBA) {
-            SDL_Log("Failed to convert surface to RGBA32: %s", SDL_GetError());
+            LOG_ERR("Renderer", "Failed to convert surface to RGBA32");
             return;
         }
 
@@ -150,7 +148,7 @@ namespace Nova {
         }
 
         if (changed) {
-            SDL_Log("Skybox changed or initializing...");
+            LOG_INF("Renderer", "Loading skybox textures");
             std::vector<std::string> paths;
             for (int i = 0; i < 6; i++) {
                 currentSkyboxPaths[i] = newPaths[i];
@@ -159,7 +157,6 @@ namespace Nova {
                     path = "resources/sky/" + path.substr(24);
                 }
                 paths.push_back(path);
-                SDL_Log("  Face %d: %s", i, path.c_str());
             }
             LoadSkyboxTexture(paths);
         }
@@ -173,7 +170,7 @@ namespace Nova {
         for (int i = 0; i < 6; i++) {
             surfaces[i] = IMG_Load(paths[i].c_str());
             if (!surfaces[i]) {
-                SDL_Log("Failed to load skybox texture %s: %s", paths[i].c_str(), SDL_GetError());
+                LOG_ERR("Renderer", "Failed to load skybox texture: %s", paths[i].c_str());
                 success = false;
             } else {
                 SDL_Surface* rgba = SDL_ConvertSurface(surfaces[i], SDL_PIXELFORMAT_RGBA32);
@@ -183,7 +180,7 @@ namespace Nova {
         }
 
         if (!success) {
-            SDL_Log("Skybox loading failed due to missing textures.");
+            LOG_ERR("Renderer", "Skybox loading failed due to missing textures");
             for (int i = 0; i < 6; i++) if (surfaces[i]) SDL_DestroySurface(surfaces[i]);
             return;
         }
@@ -251,6 +248,6 @@ namespace Nova {
         SDL_WaitForGPUFences(device, true, &fence, 1);
         SDL_ReleaseGPUFence(device, fence);
         SDL_ReleaseGPUTransferBuffer(device, ltBuf);
-        SDL_Log("Skybox cubemap created successfully (%dx%d).", width, height);
+        LOG_INF("Renderer", "Skybox cubemap created (%dx%d)", width, height);
     }
 }

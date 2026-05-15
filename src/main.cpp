@@ -32,7 +32,8 @@ int main(int argc, char* argv[]) {
         local p = Instance.new("Part")
         p.Name = "MyLuauPart"
         p.Parent = workspace
-        p.Position = Vector3.new(0, 250, 150)
+        p.Position = Vector3.new(100, 250, 150)
+        local oldpos = Vector3.new(100, 250, 150)
         p.Size = Vector3.new(2, 1, 2)
         print("Created part: " .. p.Name)
         print("Part Parent: " .. p.Parent.Name)
@@ -48,6 +49,7 @@ int main(int argc, char* argv[]) {
             explosion.BlastRadius = 100
             explosion.BlastPressure = 10000
             print(p.Position, explosion.Position)
+            print(p.Position, oldpos)
             explosion.Parent = workspace
         end)
 

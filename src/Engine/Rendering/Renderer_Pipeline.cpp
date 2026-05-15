@@ -8,6 +8,7 @@
 
 #include "Renderer.hpp"
 #include "Geometry.hpp"
+#include "Common/Log.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_log.h>
 #include <fstream>
@@ -92,14 +93,13 @@ namespace Nova {
         basePipeline = SDL_CreateGPUGraphicsPipeline(device, &pInfo);
         SDL_ReleaseGPUShader(device, vShader);
         SDL_ReleaseGPUShader(device, fShader);
-        SDL_Log("Base pipeline initialized.");
+        LOG_INF("Renderer", "Base pipeline initialized");
 
         // Skybox Pipeline
         auto skyVCode = LoadSPIRV("shaders/skybox.vert.spv");
         auto skyFCode = LoadSPIRV("shaders/skybox.frag.spv");
 
         if (!skyVCode.empty() && !skyFCode.empty()) {
-            SDL_Log("Skybox shaders loaded (%zu, %zu bytes).", skyVCode.size(), skyFCode.size());
             SDL_GPUShaderCreateInfo skyVInfo = {
                 .code_size = skyVCode.size(),
                 .code = skyVCode.data(),
@@ -128,17 +128,15 @@ namespace Nova {
             skyPInfo.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
 
             skyboxPipeline = SDL_CreateGPUGraphicsPipeline(device, &skyPInfo);
-            if (skyboxPipeline) {
-                SDL_Log("Skybox pipeline created successfully.");
-            } else {
-                SDL_Log("Failed to create skybox pipeline: %s", SDL_GetError());
+            if (!skyboxPipeline) {
+                LOG_ERR("Renderer", "Failed to create skybox pipeline: %s", SDL_GetError());
             }
 
             SDL_ReleaseGPUShader(device, skyVShader);
             SDL_ReleaseGPUShader(device, skyFShader);
         } else {
             skyboxPipeline = nullptr;
-            SDL_Log("Skybox shaders not found (expected shaders/skybox.vert.spv and shaders/skybox.frag.spv). Skybox will be disabled.");
+            LOG_WRN("Renderer", "Skybox shaders not found, skybox disabled");
         }
     }
 }

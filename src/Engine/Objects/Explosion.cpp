@@ -11,42 +11,36 @@
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
+#include "Common/Log.hpp"
 #include <glm/glm.hpp>
-#include <iostream>
 
 namespace Nova {
-    Explosion::Explosion() : Instance("Explosion") {}
+    Explosion::Explosion() : Instance("Explosion") {
+        LOG_DBG("Explosion", "Created");
+    }
 
     void Explosion::OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) {
         Instance::OnAncestorChanged(instance, newParent);
-        
+
+        LOG_DBG("Explosion", "OnAncestorChanged, parent=%s", newParent ? newParent->GetName().c_str() : "nil");
+
         auto dm = GetDataModel();
         if (dm) {
             auto workspace = dm->GetService<Workspace>();
             if (IsDescendantOf(workspace)) {
                 if (auto physics = dm->GetService<PhysicsService>()) {
-                    glm::vec3 pos = position;
-                    float radius = BlastRadius;
+                    physics->QueueExplosion(position, BlastRadius, BlastPressure);
 
-                    std::cout << "[Explosion] Queuing explosion at (" << pos.x << ", " << pos.y << ", " << pos.z
-                              << ") with radius " << radius << std::endl;
-
-                    physics->QueueExplosion(pos, radius, BlastPressure);
-                    
-                    // Start visual effect
                     m_visualActive = true;
                     m_visualTime = 0.0f;
-                    
-                    // Note: Hit signal will be fired by PhysicsService when processing the explosion
-                    // This is handled internally by the physics thread
                 }
             }
         }
     }
-    
+
     void Explosion::UpdateVisual(float dt) {
         if (!m_visualActive) return;
-        
+
         m_visualTime += dt;
         if (m_visualTime >= m_visualDuration) {
             m_visualActive = false;

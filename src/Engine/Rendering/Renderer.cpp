@@ -12,6 +12,7 @@
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/Lighting.hpp"
 #include "Engine/Services/DataModel.hpp"
+#include "Common/Log.hpp"
 #include "Geometry.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_log.h>
@@ -41,7 +42,6 @@ namespace Nova {
         depthTexture = SDL_CreateGPUTexture(device, &info);
         width = w;
         height = h;
-        SDL_Log("Depth buffer recreated: %dx%d", w, h);
     }
 
     void Framebuffer::Cleanup(SDL_GPUDevice* device) {

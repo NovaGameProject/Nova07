@@ -8,8 +8,8 @@
 
 #include "Engine/Services/PhysicsService.hpp"
 #include "Engine/Objects/BasePart.hpp"
+#include "Common/Log.hpp"
 #include <Jolt/Physics/Body/BodyInterface.h>
-#include <iostream>
 
 namespace Nova {
 
@@ -40,9 +40,9 @@ namespace Nova {
                         float distance = glm::length(worldCF.position - exp.position);
                         if (distance <= exp.radius) {
                             affectedParts.insert(p.get());
-                            
+
                             glm::vec3 direction = (distance > 0.01f) ? glm::normalize(worldCF.position - exp.position) : glm::vec3(0, 1, 0);
-                            float impulseMagnitude = exp.pressure * (1.0f - distance / exp.radius) * 5.0f; 
+                            float impulseMagnitude = exp.pressure * (1.0f - distance / exp.radius) * 5.0f;
                             partImpulses[p.get()] = direction * impulseMagnitude;
                         }
                     }
@@ -58,20 +58,20 @@ namespace Nova {
             for (auto& [p, impulse] : partImpulses) {
                 if (p->physicsBodyID.IsInvalid()) continue;
                 if (bi.GetMotionType(p->physicsBodyID) == JPH::EMotionType::Static) continue;
-                
+
                 auto itAss = mPartToAssembly.find(p);
                 if (itAss == mPartToAssembly.end()) continue;
-                
+
                 auto itRel = itAss->second->relativeTransforms.find(p);
                 if (itRel == itAss->second->relativeTransforms.end()) continue;
 
                 CFrame worldCF = itAss->second->rootPart->cframe * itRel->second;
-                bi.AddImpulse(p->physicsBodyID, JPH::Vec3(impulse.x, impulse.y, impulse.z), 
+                bi.AddImpulse(p->physicsBodyID, JPH::Vec3(impulse.x, impulse.y, impulse.z),
                     JPH::RVec3(worldCF.position.x, worldCF.position.y, worldCF.position.z));
-                
+
                 updatedBodies.insert(p->physicsBodyID);
             }
-            
+
             for (auto id : updatedBodies) {
                 bi.ActivateBody(id);
             }
@@ -88,7 +88,7 @@ namespace Nova {
         std::shared_lock<std::shared_mutex> mapLock(mMapsMutex);
         for (auto& [id, assembly] : mBodyToAssembly) {
             bool bodyAffected = false;
-            
+
             for (auto& wp : assembly->parts) {
                 auto p = wp.lock();
                 if (!p) continue;
@@ -98,7 +98,7 @@ namespace Nova {
 
                 CFrame worldCF = assembly->rootPart->cframe * itRel->second;
                 float distance = glm::length(worldCF.position - position);
-                
+
                 if (distance <= radius) {
                     bodyAffected = true;
                     affectedParts.push_back({p, distance});
@@ -107,7 +107,7 @@ namespace Nova {
                         glm::vec3 direction = (distance > 0.01f) ? glm::normalize(worldCF.position - position) : glm::vec3(0, 1, 0);
                         float impulseMagnitude = pressure * (1.0f - distance / radius) * 5.0f;
                         glm::vec3 impulse = direction * impulseMagnitude;
-                        
+
                         bi.AddImpulse(id, JPH::Vec3(impulse.x, impulse.y, impulse.z),
                             JPH::RVec3(worldCF.position.x, worldCF.position.y, worldCF.position.z));
                     }

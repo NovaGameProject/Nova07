@@ -10,6 +10,7 @@
 #include "Engine/Reflection/LevelLoader.hpp"
 #include "Engine/Nova.hpp"
 #include "Engine/Reflection/ClassDescriptor.hpp"
+#include "Common/Log.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <tracy/Tracy.hpp>
@@ -49,7 +50,6 @@ namespace Nova {
         scriptContext->SetDataModel(dataModel);
 
         SetupDefaultLighting();
-        LevelLoader::PrintInstanceTree(dataModel);
     }
 
     void Engine::SetupDefaultLighting() {
@@ -71,7 +71,7 @@ namespace Nova {
         if (!hasSky) {
             auto sky = std::make_shared<Sky>();
             sky->SetParent(lighting);
-            SDL_Log("Added default Sky instance.");
+            LOG_INF("Engine", "Added default Sky instance.");
         }
     }
 

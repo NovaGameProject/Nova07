@@ -8,11 +8,11 @@
 
 #pragma once
 #include "Engine/TaskScheduler.hpp"
+#include "Common/Log.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_keycode.h>
 #include <string>
-#include <iostream>
 
 namespace Nova {
     class Window {
@@ -23,13 +23,12 @@ namespace Nova {
 
         Window(std::string title, int width, int height) {
             if (!SDL_Init(SDL_INIT_VIDEO)) {
-                std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
+                LOG_ERR("Window", "SDL_Init failed: %s", SDL_GetError());
             }
 
-            // SDL_WINDOW_OPENGL is still used to hint at a hardware-accelerated window
             window = SDL_CreateWindow(title.c_str(), width, height, SDL_WINDOW_RESIZABLE);
             if (!window) {
-                std::cerr << "Window Error: " << SDL_GetError() << std::endl;
+                LOG_ERR("Window", "Failed to create window: %s", SDL_GetError());
             }
         }
 
