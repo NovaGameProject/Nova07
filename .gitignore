@@ -1,6 +1,11 @@
-# CMake generated files
+# Build directories
 build/
 out/
+
+# xmake generated files
+.xmake/
+
+# CMake legacy (in case of partial migration)
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/

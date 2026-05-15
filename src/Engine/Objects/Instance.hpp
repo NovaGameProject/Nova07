@@ -28,7 +28,7 @@
 #endif
 #undef lua_rawgetp
 #undef lua_rawsetp
-#include <luabridge3/LuaBridge/LuaBridge.h>
+#include <LuaBridge/LuaBridge.h>
 
 namespace Nova {
     class DataModel;

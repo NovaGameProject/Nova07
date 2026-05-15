@@ -19,38 +19,38 @@ Nova is an independent project and is not affiliated with, sponsored by, or endo
 This project utilizes certain legacy textures, meshes, and sounds originally created by Roblox Corporation (c. 2007-2009). These assets are used under the principles of preservation and are the intellectual property of Roblox Corp. Nova is intended as a "clean-room" engine implementation; the source code is entirely original and licensed under the GPL v3.
 
 ## 🚀 Getting Started
-### Configuring CMake
 
-vcpkg:
-to configure and build, you must install vcpkg:
+### Prerequisites
+
+Install [xmake](https://xmake.io):
 ```bash
-git clone https://github.com/microsoft/vcpkg.git
+# Linux/macOS
+curl -fsSL https://xmake.io/shget.text | bash
 
-cd vcpkg
-
-.\bootstrap-vcpkg.bat  # On Windows
-# or
-./bootstrap-vcpkg.sh   # On Linux/macOS   
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://xmake.io/psget.text" -OutFile install.ps1; .\install.ps1
 ```
 
-Configure with the standard cmake command:
+You also need a Vulkan-capable GPU and the Vulkan SDK (for `glslc` shader compiler).
+
+### Building
+
+Configure and build in one step:
 ```bash
-cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
+xmake f -m debug   # configure for debug mode
+xmake              # build
 ```
 
-`-DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake` please point this to the vcpkg/scripts/buildsystems/vcpkg.cmake
-`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` is optional, unless you want full IDE support.
-`-G Ninja` is also optional, but highly recommended over make.
-`-DCMAKE_BUILD_TYPE=Debug` you can change this to Release, or other CMake build types
-
-
-### Building with CMake
-
-Build with the standard cmake command:
+Run the engine:
 ```bash
-cmake --build build
+xmake run
 ```
-You can also use `ninja` or `make` in the directory `build` but this is much better, and it auto-detects!
+
+Other useful commands:
+```bash
+xmake f -m release   # switch to release mode
+xmake clean          # clean build artifacts
+xmake install        # install to system (optional)
 
 ## Contributing
 
