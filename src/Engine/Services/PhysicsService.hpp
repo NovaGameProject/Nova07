@@ -150,6 +150,8 @@ namespace Nova {
 
         // Tracks ALL bodies currently alive in Jolt
         std::unordered_set<JPH::BodyID, BodyIDHasher> mAllActiveBodies;
+        std::vector<JPH::BodyID> mSleepingBodies;  // Bodies that went to sleep this frame
+        std::mutex mSleepingMutex;
 
         // Humanoid tracking
         std::vector<std::shared_ptr<Humanoid>> mHumanoids;

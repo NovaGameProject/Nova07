@@ -144,13 +144,11 @@ namespace Nova {
                     CFrame rel0 = a0->relativeTransforms.at(p0.get());
                     CFrame rel1 = a1->relativeTransforms.at(p1.get());
 
-                    if (joint->GetClassName() == "Motor") {
+                    if (joint->GetClassName() == "Motor" || joint->GetClassName() == "Hinge" || joint->GetClassName() == "VelocityMotor") {
                         JPH::HingeConstraintSettings settings;
                         settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
-                        auto cf0_part = static_cast<Motor*>(joint.get())->c0;
-                        auto cf1_part = static_cast<Motor*>(joint.get())->c1;
-                        CFrame cf0 = rel0 * cf0_part;
-                        CFrame cf1 = rel1 * cf1_part;
+                        CFrame cf0 = rel0 * joint->c0;
+                        CFrame cf1 = rel1 * joint->c1;
                         settings.mPoint1 = JPH::RVec3(cf0.position.x, cf0.position.y, cf0.position.z);
                         settings.mPoint2 = JPH::RVec3(cf1.position.x, cf1.position.y, cf1.position.z);
                         settings.mHingeAxis1 = JPH::Vec3(cf0.rotation[0].x, cf0.rotation[0].y, cf0.rotation[0].z);
@@ -158,37 +156,7 @@ namespace Nova {
                         settings.mNormalAxis1 = JPH::Vec3(cf0.rotation[1].x, cf0.rotation[1].y, cf0.rotation[1].z);
                         settings.mNormalAxis2 = JPH::Vec3(cf1.rotation[1].x, cf1.rotation[1].y, cf1.rotation[1].z);
                         c = settings.Create(*multiLock.GetBody(0), *multiLock.GetBody(1));
-                    }
-                    else if (joint->GetClassName() == "Hinge") {
-                        JPH::HingeConstraintSettings settings;
-                        settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
-                        auto cf0_part = static_cast<Hinge*>(joint.get())->c0;
-                        auto cf1_part = static_cast<Hinge*>(joint.get())->c1;
-                        CFrame cf0 = rel0 * cf0_part;
-                        CFrame cf1 = rel1 * cf1_part;
-                        settings.mPoint1 = JPH::RVec3(cf0.position.x, cf0.position.y, cf0.position.z);
-                        settings.mPoint2 = JPH::RVec3(cf1.position.x, cf1.position.y, cf1.position.z);
-                        settings.mHingeAxis1 = JPH::Vec3(cf0.rotation[0].x, cf0.rotation[0].y, cf0.rotation[0].z);
-                        settings.mHingeAxis2 = JPH::Vec3(cf1.rotation[0].x, cf1.rotation[0].y, cf1.rotation[0].z);
-                        settings.mNormalAxis1 = JPH::Vec3(cf0.rotation[1].x, cf0.rotation[1].y, cf0.rotation[1].z);
-                        settings.mNormalAxis2 = JPH::Vec3(cf1.rotation[1].x, cf1.rotation[1].y, cf1.rotation[1].z);
-                        c = settings.Create(*multiLock.GetBody(0), *multiLock.GetBody(1));
-                    }
-                    else if (joint->GetClassName() == "VelocityMotor") {
-                        JPH::HingeConstraintSettings settings;
-                        settings.mSpace = JPH::EConstraintSpace::LocalToBodyCOM;
-                        auto cf0_part = static_cast<VelocityMotor*>(joint.get())->c0;
-                        auto cf1_part = static_cast<VelocityMotor*>(joint.get())->c1;
-                        CFrame cf0 = rel0 * cf0_part;
-                        CFrame cf1 = rel1 * cf1_part;
-                        settings.mPoint1 = JPH::RVec3(cf0.position.x, cf0.position.y, cf0.position.z);
-                        settings.mPoint2 = JPH::RVec3(cf1.position.x, cf1.position.y, cf1.position.z);
-                        settings.mHingeAxis1 = JPH::Vec3(cf0.rotation[0].x, cf0.rotation[0].y, cf0.rotation[0].z);
-                        settings.mHingeAxis2 = JPH::Vec3(cf1.rotation[0].x, cf1.rotation[0].y, cf1.rotation[0].z);
-                        settings.mNormalAxis1 = JPH::Vec3(cf0.rotation[1].x, cf0.rotation[1].y, cf0.rotation[1].z);
-                        settings.mNormalAxis2 = JPH::Vec3(cf1.rotation[1].x, cf1.rotation[1].y, cf1.rotation[1].z);
-                        c = settings.Create(*multiLock.GetBody(0), *multiLock.GetBody(1));
-                        if (c) {
+                        if (c && joint->GetClassName() == "VelocityMotor") {
                             auto* h = static_cast<JPH::HingeConstraint*>(c);
                             h->SetMotorState(JPH::EMotorState::Velocity);
                             h->SetTargetAngularVelocity(static_cast<VelocityMotor*>(joint.get())->MaxVelocity);

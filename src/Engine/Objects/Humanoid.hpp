@@ -98,5 +98,11 @@ namespace Nova {
         void ApplyKeepUpright(float dt);
         void CheckGrounded();
         void SyncPartTransforms();
+
+        void ForEachPart(auto&& fn) {
+            fn(torsoPart); fn(headPart);
+            fn(leftArmPart); fn(rightArmPart);
+            fn(leftLegPart); fn(rightLegPart);
+        }
     };
 }

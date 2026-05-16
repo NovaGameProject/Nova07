@@ -31,3 +31,6 @@ CMakeLists.txt.user*
 *.swp
 *.swo
 .cache
+
+
+tmp/

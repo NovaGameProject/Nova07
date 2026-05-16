@@ -32,6 +32,37 @@ int main(int argc, char* argv[]) {
 
     engine.LoadLevel(level);
 
+    // Run test scripts on server
+    auto scriptContext = engine.GetDataModel()->GetService<Nova::ScriptContext>();
+
+    scriptContext->Execute("print('Server: Hello from Luau!')");
+    scriptContext->Execute("print('Server: Game name: ' .. game.Name)");
+    scriptContext->Execute("print('Server: Workspace name: ' .. workspace.Name)");
+
+    // Explosion test script
+    scriptContext->Execute(R"(
+        local touched = false
+        local p = Instance.new("Part")
+        p.Name = "ExplosionTestPart"
+        p.Parent = workspace
+        p.Position = Vector3.new(100, 1000, 150)
+        p.Size = Vector3.new(2, 1, 2)
+        print("Server: Created part: " .. p.Name)
+
+        p.Touched:Connect(function(other)
+            print("Server: Part touched by " .. other.Name)
+            if touched then return end
+            touched = true
+
+            local explosion = Instance.new("Explosion")
+            explosion.Position = p.Position
+            explosion.BlastRadius = 1000
+            explosion.BlastPressure = 10000
+            explosion.Parent = workspace
+            print("Server: Explosion created!")
+        end)
+    )");
+
     LOG_INF("NCCService", "Server running on port %u. Press Ctrl+C to stop.", port);
     engine.Run();
 

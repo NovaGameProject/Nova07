@@ -28,6 +28,8 @@ namespace Nova {
         RemoteFunctionResponse = 7,
         PlayerJoin = 8,
         PlayerLeave = 9,
+        BatchPropertyUpdate = 10,
+        BulkCFrameUpdate = 11,
     };
 
     struct PacketHeader {

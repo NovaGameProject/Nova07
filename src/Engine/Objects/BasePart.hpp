@@ -30,6 +30,12 @@ namespace Nova {
         float transparency = 0.0f;
         int brickColor = 194; // Medium Stone Grey
 
+        // Client-side network interpolation
+        CFrame networkTargetCFrame;
+        CFrame networkPrevCFrame;
+        float networkLerpAlpha = 1.0f;  // 1.0 = at target, 0.0 = at prev
+        static constexpr float NETWORK_LERP_SPEED = 20.0f;  // Interpolation speed
+
         SurfaceType topSurface = SurfaceType::Studs;
         SurfaceType bottomSurface = SurfaceType::Inlets;
         SurfaceType leftSurface = SurfaceType::Smooth;
@@ -90,6 +96,22 @@ namespace Nova {
 
         void OnAncestorChanged(std::shared_ptr<Instance> instance, std::shared_ptr<Instance> newParent) override;
         void OnPropertyChanged(const std::string& name) override;
+
+        void SetNetworkTargetCFrame(const CFrame& target) {
+            networkPrevCFrame = cframe;
+            networkTargetCFrame = target;
+            networkLerpAlpha = 0.0f;
+        }
+
+        void UpdateNetworkInterpolation(float dt) {
+            if (networkLerpAlpha >= 1.0f) return;
+            networkLerpAlpha = std::min(1.0f, networkLerpAlpha + dt * NETWORK_LERP_SPEED);
+            float t = networkLerpAlpha;
+            cframe.position = glm::mix(networkPrevCFrame.position, networkTargetCFrame.position, t);
+            glm::quat q0 = glm::quat_cast(networkPrevCFrame.rotation);
+            glm::quat q1 = glm::quat_cast(networkTargetCFrame.rotation);
+            cframe.rotation = glm::mat3_cast(glm::slerp(q0, q1, t));
+        }
 
         std::string GetClassName() const override { return "BasePart"; }
         std::string GetName() const override { return m_debugName; }

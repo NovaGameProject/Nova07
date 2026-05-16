@@ -73,6 +73,7 @@ namespace Nova {
         static luabridge::LuaRef LuaNewIndex(Instance& self, const luabridge::LuaRef& key, const luabridge::LuaRef& value, lua_State* L);
 
         bool IsRoot() const { return parent.expired(); }
+        bool IsDestroyed() const { return m_destroyed; }
 
     protected:
         bool m_destroyed = false;

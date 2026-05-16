@@ -16,6 +16,7 @@ add_requires("glm")
 add_requires("joltphysics")
 add_requires("pugixml")
 add_requires("enet")
+add_requires("zstd")
 add_requires("tracy v0.12.2", { configs = { on_demand = true } })
 
 -- Shader compilation rule using glslc (from shaderc)
@@ -78,6 +79,7 @@ target("Nova07")
         "joltphysics",
         "pugixml",
         "enet",
+        "zstd",
         "tracy"
     )
 
@@ -103,5 +105,17 @@ target("NCCService")
         "joltphysics",
         "pugixml",
         "enet",
+        "zstd",
         "tracy"
+    )
+
+target("ReplicationTests")
+    set_kind("binary")
+    set_default(false)
+
+    add_files("tests/test_replication.cpp")
+    add_includedirs("src")
+
+    add_packages(
+        "glm"
     )

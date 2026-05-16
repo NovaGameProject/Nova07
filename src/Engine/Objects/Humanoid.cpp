@@ -45,21 +45,10 @@ namespace Nova {
         leftLegPart->size = {1.0f, 2.0f, 1.0f};
         rightLegPart->size = {1.0f, 2.0f, 1.0f};
 
-        // All parts are unanchored and not collidable (we manage physics manually)
-        headPart->anchored = false;
-        torsoPart->anchored = false;
-        leftArmPart->anchored = false;
-        rightArmPart->anchored = false;
-        leftLegPart->anchored = false;
-        rightLegPart->anchored = false;
-
-        // Disable auto-collision for humanoid parts (they don't merge into assemblies)
-        headPart->canCollide = false;
-        torsoPart->canCollide = false;
-        leftArmPart->canCollide = false;
-        rightArmPart->canCollide = false;
-        leftLegPart->canCollide = false;
-        rightLegPart->canCollide = false;
+        ForEachPart([](auto& part) {
+            part->anchored = false;
+            part->canCollide = false;
+        });
     }
 
     Humanoid::~Humanoid() {
@@ -108,12 +97,7 @@ namespace Nova {
         };
 
         // Create all bodies as dynamic
-        createBody(torsoPart, true);
-        createBody(headPart, true);
-        createBody(leftArmPart, true);
-        createBody(rightArmPart, true);
-        createBody(leftLegPart, true);
-        createBody(rightLegPart, true);
+        ForEachPart([&](auto& part) { createBody(part, true); });
 
         // Create joints
         CreateJoints();
@@ -144,12 +128,7 @@ namespace Nova {
             }
         };
 
-        removeBody(torsoPart);
-        removeBody(headPart);
-        removeBody(leftArmPart);
-        removeBody(rightArmPart);
-        removeBody(leftLegPart);
-        removeBody(rightLegPart);
+        ForEachPart(removeBody);
 
         physicsInitialized = false;
     }
@@ -329,12 +308,7 @@ namespace Nova {
             }
         };
 
-        teleportBody(torsoPart);
-        teleportBody(headPart);
-        teleportBody(leftArmPart);
-        teleportBody(rightArmPart);
-        teleportBody(leftLegPart);
-        teleportBody(rightLegPart);
+        ForEachPart(teleportBody);
 
         // Re-create joints
         CreateJoints();
@@ -488,12 +462,7 @@ namespace Nova {
                 glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ()));
         };
 
-        syncPart(torsoPart);
-        syncPart(headPart);
-        syncPart(leftArmPart);
-        syncPart(rightArmPart);
-        syncPart(leftLegPart);
-        syncPart(rightLegPart);
+        ForEachPart(syncPart);
     }
 
 } // namespace Nova

@@ -13,6 +13,7 @@
 #include "Engine/Reflection/ClassDescriptor.hpp"
 #include "Engine/Services/DataModel.hpp"
 #include "Engine/Services/Workspace.hpp"
+#include "Engine/Services/NetworkService.hpp"
 #include "Common/Log.hpp"
 
 namespace Nova {
@@ -183,6 +184,15 @@ namespace Nova {
                                 cf.position = pos;
                                 it->second->set(&self, PropertyValue(cf));
                                 self.OnPropertyChanged("CFrame");
+
+                                // Notify NetworkService
+                                if (self.networkID != 0) {
+                                    if (auto dm = self.GetDataModel()) {
+                                        if (auto network = dm->GetService<NetworkService>()) {
+                                            network->MarkDirty(&self, "CFrame");
+                                        }
+                                    }
+                                }
                             }
                             lua_pop(L, 1);
                             return luabridge::LuaRef(L);
@@ -191,6 +201,15 @@ namespace Nova {
                         if (auto it = desc->properties.find("Position"); it != desc->properties.end()) {
                             it->second->set(&self, PropertyValue(pos));
                             self.OnPropertyChanged("Position");
+
+                            // Notify NetworkService
+                            if (self.networkID != 0) {
+                                if (auto dm = self.GetDataModel()) {
+                                    if (auto network = dm->GetService<NetworkService>()) {
+                                        network->MarkDirty(&self, "Position");
+                                    }
+                                }
+                            }
                             lua_pop(L, 1);
                             return luabridge::LuaRef(L);
                         }
@@ -211,6 +230,15 @@ namespace Nova {
             if (auto it = desc->properties.find(skey); it != desc->properties.end()) {
                 if (it->second->set(&self, propVal)) {
                     self.OnPropertyChanged(skey);
+
+                    // Notify NetworkService if this is a replicated property
+                    if (self.networkID != 0 && desc->replicatedProperties.contains(skey)) {
+                        if (auto dm = self.GetDataModel()) {
+                            if (auto network = dm->GetService<NetworkService>()) {
+                                network->MarkDirty(&self, skey);
+                            }
+                        }
+                    }
                 } else {
                     LOG_WRN("Instance", "Failed to set property '%s' on %s", skey.c_str(), self.GetClassName().c_str());
                 }
@@ -333,6 +361,15 @@ namespace Nova {
     void Instance::Destroy() {
         if (m_destroyed) return;
         m_destroyed = true;
+
+        // Notify NetworkService to broadcast destroy to clients
+        if (networkID != 0) {
+            if (auto dm = GetDataModel()) {
+                if (auto network = dm->GetService<NetworkService>()) {
+                    network->BroadcastDestroyObject(networkID);
+                }
+            }
+        }
 
         auto childrenCopy = children;
         for (auto& child : childrenCopy) {

@@ -12,6 +12,7 @@
 #include "Engine/Objects/Humanoid.hpp"
 #include "Engine/Services/Workspace.hpp"
 #include "Engine/Services/DataModel.hpp"
+#include "Engine/Services/NetworkService.hpp"
 #include "Engine/Physics/ContactListener.hpp"
 #include "Common/Log.hpp"
 #include <Jolt/RegisterTypes.h>
@@ -72,10 +73,10 @@ namespace Nova {
         physicsSystem->SetGravity(JPH::Vec3(0, -196.2f, 0));
 
         JPH::PhysicsSettings settings;
-        settings.mPointVelocitySleepThreshold = 1.0f;
+        settings.mPointVelocitySleepThreshold = 0.05f;
         settings.mNumVelocitySteps = 4;
         settings.mMinVelocityForRestitution = 1.5f;
-        settings.mTimeBeforeSleep = 0.5;
+        settings.mTimeBeforeSleep = 2.0f;
         settings.mNumPositionSteps = 2;
         settings.mBaumgarte = 0.2f;
         settings.mSpeculativeContactDistance = 0.05f;
@@ -355,9 +356,11 @@ namespace Nova {
         float destroyHeight = -500.0f;
         auto dm = GetDataModel();
         std::shared_ptr<Workspace> ws = nullptr;
+        std::shared_ptr<NetworkService> network = nullptr;
         if (dm) {
             ws = dm->GetService<Workspace>();
             if (ws) destroyHeight = ws->FallenPartsDestroyHeight;
+            network = dm->GetService<NetworkService>();
         }
 
         std::vector<std::shared_ptr<BasePart>> toRemove;
@@ -367,12 +370,67 @@ namespace Nova {
                     toRemove.push_back(part);
                     continue;
                 }
+
+                glm::vec3 oldPos = part->cframe.position;
+                glm::mat3 oldRot = part->cframe.rotation;
+
                 part->cframe.position = update.position;
                 part->cframe.rotation = glm::mat3_cast(update.rotation);
+
+                // Only notify NetworkService if transform changed significantly
+                if (part->networkID != 0 && network) {
+                    float posDelta = glm::distance(oldPos, update.position);
+                    glm::quat oldQ = glm::quat_cast(oldRot);
+                    glm::quat newQ = update.rotation;
+                    float rotDelta = 1.0f - glm::abs(glm::dot(oldQ, newQ));
+                    if (posDelta > 0.02f || rotDelta > 0.005f) {
+                        network->MarkDirty(part.get(), "CFrame");
+                    }
+                }
+            }
+        }
+
+        // Send final CFrame for bodies that just went to sleep
+        if (network) {
+            std::vector<JPH::BodyID> sleepingCopy;
+            {
+                std::lock_guard<std::mutex> lock(mSleepingMutex);
+                sleepingCopy.swap(mSleepingBodies);
+            }
+            std::shared_lock<std::shared_mutex> mapLock(mMapsMutex);
+            auto& bi = physicsSystem->GetBodyInterface();
+            for (auto& bodyID : sleepingCopy) {
+                auto it = mBodyToAssembly.find(bodyID);
+                if (it == mBodyToAssembly.end()) continue;
+                auto assembly = it->second;
+                JPH::RVec3 pos;
+                JPH::Quat rot;
+                bi.GetPositionAndRotation(bodyID, pos, rot);
+                CFrame bodyCF;
+                bodyCF.position = glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ());
+                bodyCF.rotation = glm::mat3_cast(glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ()));
+                for (auto& wp : assembly->parts) {
+                    auto part = wp.lock();
+                    if (!part || part->networkID == 0) continue;
+                    auto itRel = assembly->relativeTransforms.find(part.get());
+                    if (itRel == assembly->relativeTransforms.end()) continue;
+                    CFrame world = bodyCF * itRel->second;
+                    part->cframe = world;
+                    network->MarkDirty(part.get(), "CFrame");
+                }
             }
         }
 
         if (!toRemove.empty()) {
+            // Notify NetworkService BEFORE destroying
+            if (network) {
+                for (auto& part : toRemove) {
+                    if (part->networkID != 0) {
+                        network->BroadcastDestroyObject(part->networkID);
+                    }
+                }
+            }
+
             std::vector<BasePart*> rawParts;
             for (auto& p : toRemove) rawParts.push_back(p.get());
             BulkUnregisterParts(rawParts);
@@ -405,6 +463,20 @@ namespace Nova {
         JPH::BodyInterface &bi = physicsSystem->GetBodyInterface();
         JPH::BodyIDVector activeBodies;
         physicsSystem->GetActiveBodies(JPH::EBodyType::RigidBody, activeBodies);
+
+        // Track which bodies went to sleep (were active last frame, not active now)
+        std::unordered_set<JPH::BodyID, BodyIDHasher> currentActive(activeBodies.begin(), activeBodies.end());
+        {
+            std::lock_guard<std::mutex> lock(mSleepingMutex);
+            mSleepingBodies.clear();
+            for (auto& id : mAllActiveBodies) {
+                if (!currentActive.contains(id)) {
+                    mSleepingBodies.push_back(id);
+                }
+            }
+        }
+        mAllActiveBodies = std::move(currentActive);
+
         std::vector<TransformUpdate> updates;
         std::shared_lock<std::shared_mutex> mapLock(mMapsMutex);
         for (const auto& id : activeBodies) {
